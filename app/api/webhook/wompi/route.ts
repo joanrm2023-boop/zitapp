@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import crypto from 'crypto';
 
-const WOMPI_SECRET = 'your_wompi_webhook_secret'; // Obtienes esto del dashboard de Wompi
+const WOMPI_SECRET = process.env.WOMPI_SECRET; // Obtienes esto del dashboard de Wompi
 
 export async function POST(request: NextRequest) {
   try {
@@ -211,12 +211,18 @@ async function activateSubscription(userId: string, planId: string) {
 }
 
 function verifyWebhookSignature(body: string, signature: string | null): boolean {
-  if (!signature || !WOMPI_SECRET) return true; // Skip verification in development
-  
-  const expectedSignature = crypto
-    .createHmac('sha256', WOMPI_SECRET)
-    .update(body)
-    .digest('hex');
+    // En ambiente de pruebas, skip la verificación si no hay secret
+    if (!WOMPI_SECRET || WOMPI_SECRET === 'temp_secret') {
+      console.log('Webhook verification skipped - development mode');
+      return true;
+    }
     
-  return signature === expectedSignature;
-}
+    if (!signature) return false;
+    
+    const expectedSignature = crypto
+      .createHmac('sha256', WOMPI_SECRET)
+      .update(body)
+      .digest('hex');
+      
+    return signature === expectedSignature;
+  }
