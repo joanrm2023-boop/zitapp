@@ -19,6 +19,9 @@ export default function LoginPage() {
   const [diasParaVencer, setDiasParaVencer] = useState(0)
   const [clienteParaAcceso, setClienteParaAcceso] = useState(null)
 
+  // Nuevo estado para suscripción vencida
+  const [suscripcionVencida, setSuscripcionVencida] = useState(false)
+
   const router = useRouter()
 
   // Función para calcular días transcurridos desde created_at
@@ -132,6 +135,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     setTrialExpirado(false)
+    setSuscripcionVencida(false) // Reset del nuevo estado
 
     try {
       // 1. Verificar credenciales
@@ -171,9 +175,17 @@ export default function LoginPage() {
         }
 
         if (cliente.activo === 'Inactivo') {
-          setError('Tu cuenta ha sido desactivada. Contacta al soporte para más información.')
-          setLoading(false)
-          return
+          // Verificar si la inactividad es por suscripción vencida
+          if (cliente.suscripcion_activa === false && cliente.fecha_vencimiento_plan) {
+            setSuscripcionVencida(true)
+            setLoading(false)
+            return
+          } else {
+            // Inactividad por otros motivos (soporte)
+            setError('Tu cuenta ha sido desactivada. Contacta al soporte para más información.')
+            setLoading(false)
+            return
+          }
         }
 
         if (cliente.activo === 'Inactivo por P.P') {
@@ -282,7 +294,32 @@ export default function LoginPage() {
           </motion.div>
         )}
 
-        {error && !trialExpirado && (
+        {/* Mensaje de suscripción vencida */}
+        {suscripcionVencida && (
+          <motion.div
+            className="mb-4 p-4 bg-orange-50 border border-orange-300 rounded-lg"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-orange-800 mb-2">
+                Suscripción Vencida
+              </h3>
+              <p className="text-orange-700 text-sm mb-3">
+                Tu suscripción ha expirado. Renueva tu plan para continuar usando Zitapp.
+              </p>
+              <button 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                onClick={() => router.push('/planes')}
+              >
+                Renovar Suscripción
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {error && !trialExpirado && !suscripcionVencida && (
           <motion.p
             className="text-sm text-red-500 text-center mb-4 border border-red-300 p-2 rounded bg-red-50"
             initial={{ opacity: 0 }}
@@ -293,7 +330,7 @@ export default function LoginPage() {
           </motion.p>
         )}
 
-        {!trialExpirado && (
+        {!trialExpirado && !suscripcionVencida && (
           <motion.form
             onSubmit={handleLogin}
             className="flex flex-col gap-4"
@@ -355,8 +392,8 @@ export default function LoginPage() {
           </motion.form>
         )}
 
-        {/* Sección para registrarse - solo mostrar si no hay trial expirado */}
-        {!trialExpirado && (
+        {/* Sección para registrarse - solo mostrar si no hay trial expirado ni suscripción vencida */}
+        {!trialExpirado && !suscripcionVencida && (
           <motion.div
             className="mt-4 text-center"
             initial={{ opacity: 0 }}
