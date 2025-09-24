@@ -68,11 +68,18 @@ export async function POST(request: NextRequest) {
     console.log('Respuesta de Wompi:', wompiData);
 
     if (wompiData.error || !wompiData.data) {
-        console.log('ERROR en Wompi:', wompiData);
-        return NextResponse.json({ 
-          error: 'Error al crear pago en Wompi: ' + (wompiData.error?.reason || wompiData.error || 'Respuesta inválida') 
-        }, { status: 500 });
-      }
+    console.log('=== ERROR DETALLADO EN WOMPI ===');
+    console.log('wompiData completo:', JSON.stringify(wompiData, null, 2));
+    console.log('wompiPayload enviado:', JSON.stringify(wompiPayload, null, 2));
+    console.log('================================');
+    
+    const errorDetail = wompiData.error?.type || wompiData.error?.reason || JSON.stringify(wompiData.error) || 'Error desconocido';
+    
+    return NextResponse.json({ 
+      error: `Error de Wompi: ${errorDetail}`,
+      details: wompiData.error
+    }, { status: 500 });
+}
 
       // Debugging intensivo
       console.log('=== DEBUGGING LINK ===');
