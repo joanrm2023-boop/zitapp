@@ -286,7 +286,16 @@ export default function LoginPage() {
               </p>
               <button 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                onClick={() => router.push('/planes')}
+                onClick={() => {
+                  // Guardar datos del usuario antes de ir a planes
+                  const userData = {
+                    email: email,  // Email del login
+                    isRenewal: true,  // Indicar que es renovación
+                    renewalType: 'trial_expired'  // O 'subscription_expired'
+                  };
+                  sessionStorage.setItem('renewalData', JSON.stringify(userData));
+                  router.push('/planes');
+                }}
               >
                 Actualizar Plan
               </button>
@@ -311,7 +320,16 @@ export default function LoginPage() {
               </p>
               <button 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                onClick={() => router.push('/planes')}
+                onClick={() => {
+                  // Guardar datos del usuario antes de ir a planes
+                  const userData = {
+                    email: email,  // Email del login
+                    isRenewal: true,  // Indicar que es renovación
+                    renewalType: 'trial_expired'  // O 'subscription_expired'
+                  };
+                  sessionStorage.setItem('renewalData', JSON.stringify(userData));
+                  router.push('/planes');
+                }}
               >
                 Renovar Suscripción
               </button>
