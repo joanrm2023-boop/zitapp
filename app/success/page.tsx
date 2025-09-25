@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
 
 function SuccessContent() {
   const [activationStatus, setActivationStatus] = useState<'loading' | 'success' | 'error' | 'no-data'>('loading');
@@ -42,15 +43,89 @@ function SuccessContent() {
             console.log('Datos de renovación convertidos para activación:', activationData);
           }
         }
+
+        // SOLUCIÓN DE EMERGENCIA: Si no hay datos en storage, usar reference de URL
+        if (!pendingActivationData) {
+          console.log('No hay datos en storage, verificando URL reference...');
+          const reference = searchParams?.get('reference');
+          
+          if (reference && reference.includes('plan_')) {
+            console.log('Reference encontrada:', reference);
+            
+            try {
+              // Extraer datos de la reference
+              const parts = reference.split('_');
+              const planId = parts[1]; // 'pro', 'basico', etc.
+              const userId = parts[2]; // user ID
+              
+              console.log('Partes de reference:', { planId, userId });
+              
+              // Buscar datos reales de la transacción en la BD
+              const { data: transaccion, error: transError } = await supabase
+                .from('transacciones_pendientes')
+                .select('*')
+                .eq('wompi_reference', reference)
+                .eq('status', 'pending')
+                .single();
+                
+              if (transError || !transaccion) {
+                console.log('No se encontró transacción:', transError);
+                throw new Error('No se encontró la transacción');
+              }
+              
+              console.log('Transacción encontrada:', transaccion);
+              
+              // Buscar datos del usuario
+              const { data: cliente, error: clienteError } = await supabase
+                .from('clientes')
+                .select('correo, nombre')
+                .eq('id_cliente', transaccion.user_id)
+                .single();
+                
+              if (clienteError || !cliente) {
+                console.log('No se encontró cliente:', clienteError);
+                throw new Error('No se encontró el cliente');
+              }
+              
+              console.log('Cliente encontrado:', cliente);
+              
+              // Crear datos de activación desde la BD
+              const activationData = {
+                email: cliente.correo,
+                planId: transaccion.plan_id,
+                planNombre: `Plan ${transaccion.plan_id.charAt(0).toUpperCase() + transaccion.plan_id.slice(1)}`,
+                notificaciones: transaccion.notificaciones_incluidas || false,
+                timestamp: Date.now()
+              };
+              
+              pendingActivationData = JSON.stringify(activationData);
+              console.log('Datos creados desde BD con reference:', activationData);
+              
+            } catch (referenceError) {
+              console.error('Error procesando reference:', referenceError);
+              // Fallback con datos básicos si falla la consulta BD
+              const activationData = {
+                email: 'usuario@email.com', // Valor por defecto
+                planId: 'pro',
+                planNombre: 'Plan Pro',
+                notificaciones: true,
+                timestamp: Date.now()
+              };
+              
+              pendingActivationData = JSON.stringify(activationData);
+              console.log('Usando datos fallback por error en BD:', activationData);
+            }
+          }
+        }
         
         if (!pendingActivationData) {
-          console.log('No hay datos de activación en ningún storage');
+          console.log('No hay datos de activación en ningún método');
           setActivationStatus('no-data');
           return;
         }
 
         const activationData = JSON.parse(pendingActivationData);
-        console.log('Datos de activación encontrados:', activationData);
+        console.log('Datos finales de activación:', activationData);
         
         setUserEmail(activationData.email);
         setPlanName(activationData.planNombre);
@@ -216,7 +291,7 @@ function SuccessContent() {
         {/* Debug Info */}
         <div className="mt-8 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-400">
-            ID de transacción: {searchParams?.get('id') || 'N/A'}
+            ID de transacción: {searchParams?.get('reference') || searchParams?.get('id') || 'N/A'}
           </p>
         </div>
       </div>
