@@ -286,13 +286,14 @@ export default function DashboardCliente() {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => {
-                  // Agregar logging para debug
                   console.log('=== GUARDANDO EN DASHBOARD ===');
                   console.log('cliente?.correo:', cliente?.correo);
+                  console.log('cliente?.nombre:', cliente?.nombre);
                   console.log('cliente?.user_id:', cliente?.user_id);
                   
                   const renovacionData = {
                     email: cliente?.correo || '',
+                    nombre: cliente?.nombre || '', // ← AGREGAR ESTA LÍNEA
                     planId: 'pendiente',
                     userId: cliente?.user_id || '',
                     esRenovacion: true

@@ -297,6 +297,7 @@ export default function PlanesPage() {
     const { data } = await supabase.auth.getSession();
     
     if (data.session && datosRenovacion) {
+      
       console.log('=== DATOS QUE SE PASARÁN A PROCESAR PAGO ===');
       console.log('datosRenovacion completo:', datosRenovacion);
       console.log('Email que se usará:', datosRenovacion.email);
@@ -309,6 +310,7 @@ export default function PlanesPage() {
         nombre: datosRenovacion.nombre,
         telefono: ''
       });
+      
     } else if (data.session) {
       // Usuario logueado sin datos de renovación - obtener de BD
       try {
