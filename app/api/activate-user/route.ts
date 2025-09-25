@@ -62,62 +62,26 @@ export async function POST(request: NextRequest) {
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
     const fechaVencimientoISO = fechaVencimiento.toISOString();
 
-    // Datos a actualizar con logging detallado
-    const updateData = { 
-      plan: planId || 'basico',
-      suscripcion_activa: true,
-      fecha_cambio_estado: new Date().toISOString(),
-      fecha_vencimiento_plan: fechaVencimientoISO,
-      notificaciones_activas: notificacionesIncluidas
-    };
+    // Una sola actualización completa que cumple con todas las validaciones RLS
+      const { error: updateError } = await supabase
+        .from('clientes')
+        .update({
+          plan: planId || 'basico',
+          suscripcion_activa: true,
+          fecha_cambio_estado: new Date().toISOString(),
+          fecha_vencimiento_plan: fechaVencimientoISO,
+          notificaciones_activas: notificacionesIncluidas,
+          activo: 'Activo',
+          estado_suscripcion: 'activa'
+        })
+        .eq('correo', email);
 
-    console.log('Datos base a actualizar (sin estado):', JSON.stringify(updateData, null, 2));
-
-    // Actualizar primero los campos básicos
-    const { error: updateBasicError } = await supabase
-      .from('clientes')
-      .update(updateData)
-      .eq('correo', email);
-
-    if (updateBasicError) {
-      console.error('Error actualizando datos básicos:', JSON.stringify(updateBasicError, null, 2));
-      return NextResponse.json({ error: 'Error actualizando datos básicos del cliente' }, { status: 500 });
-    }
-
-    console.log('Datos básicos actualizados correctamente');
-
-    // Actualizar estado y estado_suscripcion por separado usando query directo
-    const { error: updateStateError } = await supabase
-      .from('clientes')
-      .update({ 
-        activo: 'Activo',
-        estado_suscripcion: 'activa'
-      })
-      .eq('correo', email);
-
-    if (updateStateError) {
-      console.error('Error actualizando estado del cliente:', JSON.stringify(updateStateError, null, 2));
-      console.error('Intentando actualizar estado para email:', email);
-      
-      // Intentar con enfoque alternativo usando RPC si existe
-      try {
-        const { error: rpcError } = await supabase.rpc('update_cliente_estado', {
-          cliente_email: email,
-          nuevo_estado: 'Activo',
-          nuevo_estado_suscripcion: 'activa'
-        });
-        
-        if (rpcError) {
-          console.log('RPC también falló, continuando con actualización manual');
-        } else {
-          console.log('Estado actualizado vía RPC exitosamente');
-        }
-      } catch (rpcError) {
-        console.log('RPC no disponible, intentando actualización directa');
+      if (updateError) {
+        console.error('Error actualizando cliente:', JSON.stringify(updateError, null, 2));
+        return NextResponse.json({ error: 'Error actualizando cliente' }, { status: 500 });
       }
-    } else {
-      console.log('Estado del cliente actualizado correctamente a: Activo');
-    }
+
+      console.log('Cliente actualizado correctamente');
 
     // Verificar que la actualización fue exitosa
     const { data: clienteVerificacion, error: verificacionError } = await supabase
