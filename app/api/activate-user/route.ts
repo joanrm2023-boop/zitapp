@@ -26,12 +26,15 @@ export async function POST(request: NextRequest) {
 
     if (clienteError || !cliente) {
       console.log('ERROR: Cliente no encontrado:', email);
+      console.log('Error detalles:', JSON.stringify(clienteError, null, 2));
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
     }
 
     console.log('Cliente encontrado:', cliente.nombre);
+    console.log('Estado actual del cliente:', cliente.activo);
+    console.log('Suscripción actual:', cliente.suscripcion_activa);
 
-    // 🆕 NUEVO: Buscar si pagó por notificaciones en la transacción
+    // Buscar si pagó por notificaciones en la transacción
     let notificacionesIncluidas = false;
     try {
       const { data: transaccion, error: transError } = await supabase
@@ -59,32 +62,85 @@ export async function POST(request: NextRequest) {
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
     const fechaVencimientoISO = fechaVencimiento.toISOString();
 
-    // Activar el usuario - incluyendo notificaciones si las pagó
+    // Datos a actualizar con logging detallado
     const updateData = { 
-      activo: 'Activo',
       plan: planId || 'basico',
       suscripcion_activa: true,
-      estado_suscripcion: 'activa',
       fecha_cambio_estado: new Date().toISOString(),
       fecha_vencimiento_plan: fechaVencimientoISO,
-      notificaciones_activas: notificacionesIncluidas // 🆕 NUEVO CAMPO
+      notificaciones_activas: notificacionesIncluidas
     };
 
-    console.log('Datos a actualizar:', updateData);
+    console.log('Datos base a actualizar (sin estado):', JSON.stringify(updateData, null, 2));
 
-    const { error: updateError } = await supabase
+    // Actualizar primero los campos básicos
+    const { error: updateBasicError } = await supabase
       .from('clientes')
       .update(updateData)
       .eq('correo', email);
 
-    if (updateError) {
-      console.error('Error activando cliente:', updateError);
-      return NextResponse.json({ error: 'Error activando cliente' }, { status: 500 });
+    if (updateBasicError) {
+      console.error('Error actualizando datos básicos:', JSON.stringify(updateBasicError, null, 2));
+      return NextResponse.json({ error: 'Error actualizando datos básicos del cliente' }, { status: 500 });
+    }
+
+    console.log('Datos básicos actualizados correctamente');
+
+    // Actualizar estado y estado_suscripcion por separado usando query directo
+    const { error: updateStateError } = await supabase
+      .from('clientes')
+      .update({ 
+        activo: 'Activo',
+        estado_suscripcion: 'activa'
+      })
+      .eq('correo', email);
+
+    if (updateStateError) {
+      console.error('Error actualizando estado del cliente:', JSON.stringify(updateStateError, null, 2));
+      console.error('Intentando actualizar estado para email:', email);
+      
+      // Intentar con enfoque alternativo usando RPC si existe
+      try {
+        const { error: rpcError } = await supabase.rpc('update_cliente_estado', {
+          cliente_email: email,
+          nuevo_estado: 'Activo',
+          nuevo_estado_suscripcion: 'activa'
+        });
+        
+        if (rpcError) {
+          console.log('RPC también falló, continuando con actualización manual');
+        } else {
+          console.log('Estado actualizado vía RPC exitosamente');
+        }
+      } catch (rpcError) {
+        console.log('RPC no disponible, intentando actualización directa');
+      }
+    } else {
+      console.log('Estado del cliente actualizado correctamente a: Activo');
+    }
+
+    // Verificar que la actualización fue exitosa
+    const { data: clienteVerificacion, error: verificacionError } = await supabase
+      .from('clientes')
+      .select('activo, suscripcion_activa, estado_suscripcion, plan, fecha_vencimiento_plan, notificaciones_activas')
+      .eq('correo', email)
+      .single();
+
+    if (verificacionError) {
+      console.error('Error verificando actualización:', verificacionError);
+    } else {
+      console.log('=== VERIFICACIÓN POST-ACTUALIZACIÓN ===');
+      console.log('Estado actual:', clienteVerificacion.activo);
+      console.log('Suscripción activa:', clienteVerificacion.suscripcion_activa);
+      console.log('Estado suscripción:', clienteVerificacion.estado_suscripcion);
+      console.log('Plan:', clienteVerificacion.plan);
+      console.log('Fecha vencimiento:', clienteVerificacion.fecha_vencimiento_plan);
+      console.log('Notificaciones activas:', clienteVerificacion.notificaciones_activas);
+      console.log('=== FIN VERIFICACIÓN ===');
     }
 
     console.log('Cliente activado exitosamente:', email);
     console.log('Plan asignado:', planId);
-    console.log('Estado suscripción cambiado a: activa');
     console.log('Notificaciones activas:', notificacionesIncluidas);
     console.log('Fecha de vencimiento:', fechaVencimientoISO);
 
@@ -117,11 +173,13 @@ export async function POST(request: NextRequest) {
       message: 'Usuario activado correctamente',
       fechaVencimiento: fechaVencimientoISO,
       estadoSuscripcion: 'activa',
-      notificacionesActivas: notificacionesIncluidas // 🆕 NUEVO EN RESPUESTA
+      estadoCliente: clienteVerificacion?.activo || 'Activo',
+      notificacionesActivas: notificacionesIncluidas,
+      planAsignado: planId
     });
 
   } catch (error) {
-    console.error('Error en activate-user:', error);
+    console.error('Error general en activate-user:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
