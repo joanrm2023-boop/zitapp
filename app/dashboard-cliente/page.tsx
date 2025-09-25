@@ -286,17 +286,23 @@ export default function DashboardCliente() {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => {
-                  // Guardar datos del usuario actual para la renovación
+                  // Agregar logging para debug
+                  console.log('=== GUARDANDO EN DASHBOARD ===');
+                  console.log('cliente?.correo:', cliente?.correo);
+                  console.log('cliente?.user_id:', cliente?.user_id);
+                  
                   const renovacionData = {
-                    email: cliente?.correo || '', // Necesitarías añadir correo al select del cliente
+                    email: cliente?.correo || '',
                     planId: 'pendiente',
                     userId: cliente?.user_id || '',
                     esRenovacion: true
                   }
+                  
+                  console.log('renovacionData que se guarda:', renovacionData);
                   localStorage.setItem('renovacionData', JSON.stringify(renovacionData))
                   router.push('/planes')
                 }}
-                className="bg-white/20 hover:bg-white/30..."
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2 border border-white/30"
               >
                 <span>Renovar Plan</span>
                 <ChevronRight className="w-4 h-4" />

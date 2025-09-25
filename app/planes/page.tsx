@@ -297,7 +297,13 @@ export default function PlanesPage() {
     const { data } = await supabase.auth.getSession();
     
     if (data.session && datosRenovacion) {
-      // Usuario logueado con datos de renovación - usar esos datos
+      console.log('=== DATOS QUE SE PASARÁN A PROCESAR PAGO ===');
+      console.log('datosRenovacion completo:', datosRenovacion);
+      console.log('Email que se usará:', datosRenovacion.email);
+      console.log('Nombre que se usará:', datosRenovacion.nombre);
+      console.log('¿Email está vacío?', !datosRenovacion.email);
+      console.log('¿Nombre está vacío?', !datosRenovacion.nombre);
+      
       await procesarPago(planId, planConNotificaciones, {
         email: datosRenovacion.email,
         nombre: datosRenovacion.nombre,
