@@ -170,6 +170,23 @@ export default function PlanesPage() {
     console.log('Plan seleccionado:', planId);
     console.log('Con notificaciones:', notificacionesSeleccionadas[planId]);
     
+    // NUEVO: Verificar si hay datos de renovación
+    // NUEVO: Verificar si hay datos de renovación
+      const renewalData = sessionStorage.getItem('renewalData');
+      let userDataFromRenewal = null;
+
+      if (renewalData) {
+        const renewal = JSON.parse(renewalData);
+        userDataFromRenewal = {
+          email: renewal.email,
+          nombre: renewal.email.split('@')[0],
+          telefono: ''
+        };
+        sessionStorage.removeItem('renewalData');
+        console.log('Datos de renovación encontrados:', userDataFromRenewal);
+      }
+
+    
     // Validar términos y condiciones
     if (!aceptaTerminos) {
       alert('Debes aceptar los términos y condiciones para continuar');
@@ -191,26 +208,30 @@ export default function PlanesPage() {
     const { data } = await supabase.auth.getSession();
     
     if (data.session) {
-      // Usuario autenticado - obtener sus datos y proceder directamente
-      try {
-        const { data: cliente } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('id_cliente', data.session.user.id)
-          .single();
+      // Usuario autenticado - usar datos de renovación si existen, sino obtener de BD
+      if (userDataFromRenewal) {
+        // Usar datos de renovación
+        await procesarPago(planId, planConNotificaciones, userDataFromRenewal);
+      } else {
+        // Obtener datos del usuario autenticado (código original)
+        try {
+          const { data: cliente } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('id_cliente', data.session.user.id)
+            .single();
 
-        if (cliente) {
-          // Procesar pago directamente con datos del usuario autenticado
-          await procesarPago(planId, planConNotificaciones, {
-            email: cliente.correo,
-            nombre: cliente.nombre,
-            telefono: cliente.telefono || ''
-          });
+          if (cliente) {
+            await procesarPago(planId, planConNotificaciones, {
+              email: cliente.correo,
+              nombre: cliente.nombre,
+              telefono: cliente.telefono || ''
+            });
+          }
+        } catch (error) {
+          console.error('Error obteniendo datos del cliente:', error);
+          setMostrarModal(true);
         }
-      } catch (error) {
-        console.error('Error obteniendo datos del cliente:', error);
-        // Si hay error, mostrar modal para capturar datos manualmente
-        setMostrarModal(true);
       }
     } else {
       // Usuario no autenticado - mostrar modal para capturar datos
