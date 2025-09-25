@@ -11,94 +11,71 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   
   useEffect(() => {
-    const activateUser = async () => {
-      try {
-        console.log('Iniciando activación automática...');
-        
-        // Leer datos del localStorage
-        let pendingActivationData = localStorage.getItem('pendingActivation');
-        
-        // Si no hay datos en localStorage, buscar en sessionStorage
-        if (!pendingActivationData) {
-          console.log('No hay datos en localStorage, buscando en sessionStorage...');
-          const renewalData = sessionStorage.getItem('renewalData');
-          if (renewalData) {
-            const renewal = JSON.parse(renewalData);
-            console.log('Datos de renovación encontrados en sessionStorage:', renewal);
-            
-            // Convertir formato de sessionStorage a localStorage format
-            const activationData = {
-              email: renewal.email,
-              planId: 'basico', // Valor por defecto
-              planNombre: 'Plan Renovado',
-              notificaciones: false,
-              timestamp: Date.now()
-            };
-            
-            pendingActivationData = JSON.stringify(activationData);
-            
-            // Limpiar sessionStorage
-            sessionStorage.removeItem('renewalData');
-            console.log('Datos de renovación convertidos para activación:', activationData);
+      const activateUser = async () => {
+        try {
+          console.log('Iniciando activación automática...');
+          const reference = searchParams.get("reference");
+
+          if (!reference) {
+            console.log("No se encontró referencia en la URL");
+            setActivationStatus("no-data");
+            return;
           }
-        }
-        
-        if (!pendingActivationData) {
-          console.log('No hay datos de activación en ningún storage');
-          setActivationStatus('no-data');
-          return;
-        }
 
-        const activationData = JSON.parse(pendingActivationData);
-        console.log('Datos de activación encontrados:', activationData);
-        
-        setUserEmail(activationData.email);
-        setPlanName(activationData.planNombre);
+          console.log("Referencia recibida en success:", reference);
 
-        // Llamar al endpoint de activación
-        const response = await fetch('/api/activate-user', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify({
-            email: activationData.email,
-            planId: activationData.planId,
-            planNombre: activationData.planNombre
-          })
-        });
+          // Consultar la transacción en Supabase a través de un endpoint
+          const response = await fetch("/api/get-transaction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference })
+          });
 
-        const result = await response.json();
-        console.log('Respuesta de activación:', result);
-        
-        if (response.ok && result.success) {
-          console.log('Usuario activado exitosamente');
-          setActivationStatus('success');
-          
-          // Limpiar localStorage después del éxito si existe
-          if (localStorage.getItem('pendingActivation')) {
-            localStorage.removeItem('pendingActivation');
-            console.log('localStorage limpiado');
+          const result = await response.json();
+          console.log("Resultado consulta transacción:", result);
+
+          if (!response.ok || !result.transaction) {
+            setErrorMessage(result.error || "No se encontró transacción válida");
+            setActivationStatus("error");
+            return;
           }
-          
-        } else {
-          console.error('Error en activación:', result.error);
-          setErrorMessage(result.error || 'Error desconocido');
-          setActivationStatus('error');
+
+          const transaction = result.transaction;
+
+          setUserEmail(transaction.user_email);
+          setPlanName(transaction.plan_id);
+
+          // Llamar a activate-user
+          const activateRes = await fetch("/api/activate-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: transaction.user_email,
+              planId: transaction.plan_id,
+              planNombre: transaction.plan_id
+            })
+          });
+
+          const activateResult = await activateRes.json();
+          console.log("Respuesta de activación:", activateResult);
+
+          if (activateRes.ok && activateResult.success) {
+            setActivationStatus("success");
+          } else {
+            setErrorMessage(activateResult.error || "Error desconocido");
+            setActivationStatus("error");
+          }
+        } catch (err) {
+          console.error("Error en activación:", err);
+          setErrorMessage("Error de conexión");
+          setActivationStatus("error");
         }
-        
-      } catch (error) {
-        console.error('Error en activación:', error);
-        setErrorMessage('Error de conexión');
-        setActivationStatus('error');
-      }
-    };
-    
-    // Ejecutar activación después de un pequeño delay
-    const timer = setTimeout(activateUser, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+      };
+
+      const timer = setTimeout(activateUser, 1000);
+      return () => clearTimeout(timer);
+    }, [searchParams]);
+
 
   // Función para reintentar activación manual
   const retryActivation = () => {

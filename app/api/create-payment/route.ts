@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Referencia generada:', reference);
 
-    // Crear payment link en Wompi
+    /// Crear payment link en Wompi
     const wompiPayload = {
       "acceptance_token": await getAcceptanceToken(),
       "name": "Test Plan",
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       "currency": "COP",
       "customer_email": userData.email,
       "reference": reference,
-      "redirect_url": `${process.env.NEXT_PUBLIC_BASE_URL}/success?payment=success`,
+      "redirect_url": `${process.env.NEXT_PUBLIC_BASE_URL}/success?reference=${reference}`,
     };
 
     console.log('Payload para Wompi:', wompiPayload);
