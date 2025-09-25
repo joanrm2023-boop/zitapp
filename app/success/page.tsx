@@ -16,10 +16,35 @@ function SuccessContent() {
         console.log('Iniciando activación automática...');
         
         // Leer datos del localStorage
-        const pendingActivationData = localStorage.getItem('pendingActivation');
+        let pendingActivationData = localStorage.getItem('pendingActivation');
+        
+        // Si no hay datos en localStorage, buscar en sessionStorage
+        if (!pendingActivationData) {
+          console.log('No hay datos en localStorage, buscando en sessionStorage...');
+          const renewalData = sessionStorage.getItem('renewalData');
+          if (renewalData) {
+            const renewal = JSON.parse(renewalData);
+            console.log('Datos de renovación encontrados en sessionStorage:', renewal);
+            
+            // Convertir formato de sessionStorage a localStorage format
+            const activationData = {
+              email: renewal.email,
+              planId: 'basico', // Valor por defecto
+              planNombre: 'Plan Renovado',
+              notificaciones: false,
+              timestamp: Date.now()
+            };
+            
+            pendingActivationData = JSON.stringify(activationData);
+            
+            // Limpiar sessionStorage
+            sessionStorage.removeItem('renewalData');
+            console.log('Datos de renovación convertidos para activación:', activationData);
+          }
+        }
         
         if (!pendingActivationData) {
-          console.log('No hay datos de activación pendientes');
+          console.log('No hay datos de activación en ningún storage');
           setActivationStatus('no-data');
           return;
         }
@@ -50,9 +75,11 @@ function SuccessContent() {
           console.log('Usuario activado exitosamente');
           setActivationStatus('success');
           
-          // Limpiar localStorage después del éxito
-          localStorage.removeItem('pendingActivation');
-          console.log('localStorage limpiado');
+          // Limpiar localStorage después del éxito si existe
+          if (localStorage.getItem('pendingActivation')) {
+            localStorage.removeItem('pendingActivation');
+            console.log('localStorage limpiado');
+          }
           
         } else {
           console.error('Error en activación:', result.error);
