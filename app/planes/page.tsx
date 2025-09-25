@@ -218,7 +218,7 @@ export default function PlanesPage() {
           const { data: cliente } = await supabase
             .from('clientes')
             .select('*')
-            .eq('id_cliente', data.session.user.id)
+            .eq('user_id', data.session.user.id)
             .single();
 
           if (cliente) {
