@@ -128,13 +128,118 @@ export default function PlanesPage() {
     telefono: ''
   });
   const [procesandoPago, setProcesandoPago] = useState(false);
-  const [aceptaTerminos, setAceptaTerminos] = useState(false); // Estado para términos
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [estadoUsuario, setEstadoUsuario] = useState<string | null>(null);
+  const [datosRenovacion, setDatosRenovacion] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Nuevo useEffect para detectar estado del usuario
+  useEffect(() => {
+    const detectarEstadoUsuario = async () => {
+      try {
+        // 1. Verificar datos de renovación en localStorage (desde dashboard)
+        const renovacionData = localStorage.getItem('renovacionData');
+        if (renovacionData) {
+          const datos = JSON.parse(renovacionData);
+          console.log('Datos de renovación encontrados:', datos);
+          setDatosRenovacion(datos);
+          setEstadoUsuario('vencido');
+          localStorage.removeItem('renovacionData');
+          return;
+        }
+
+        // 2. Verificar si hay usuario autenticado
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setEstadoUsuario('nuevo');
+          return;
+        }
+
+        // 3. Obtener información completa del cliente autenticado
+        const { data: cliente, error } = await supabase
+          .from('clientes')
+          .select('nombre, correo, activo, suscripcion_activa, fecha_vencimiento_plan, estado_suscripcion')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error || !cliente) {
+          console.log('Cliente no encontrado:', error);
+          setEstadoUsuario('nuevo');
+          return;
+        }
+
+        console.log('Estado del cliente encontrado:', cliente);
+
+        // 4. Evaluar estado basado en datos del cliente
+        const hoy = new Date();
+        const fechaVencimiento = new Date(cliente.fecha_vencimiento_plan);
+        const diasRestantes = Math.ceil((fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (cliente.activo === 'Activo' && cliente.suscripcion_activa && diasRestantes > 5) {
+          setEstadoUsuario('activo');
+        } else if (diasRestantes <= 5 && diasRestantes > 0) {
+          setEstadoUsuario('proximo');
+          setDatosRenovacion({
+            email: cliente.correo,
+            nombre: cliente.nombre,
+            esRenovacion: true
+          });
+        } else {
+          setEstadoUsuario('vencido');
+          setDatosRenovacion({
+            email: cliente.correo,
+            nombre: cliente.nombre,
+            esRenovacion: true
+          });
+        }
+
+      } catch (error) {
+        console.error('Error detectando estado del usuario:', error);
+        setEstadoUsuario('nuevo');
+      }
+    };
+
+    if (mounted) {
+      detectarEstadoUsuario();
+    }
+  }, [mounted]);
+
+  // Función para obtener el banner apropiado según el estado
+  const obtenerBannerEstado = () => {
+    switch (estadoUsuario) {
+      case 'vencido':
+        return {
+          color: 'bg-red-500',
+          icono: '⚠️',
+          titulo: 'Suscripción Vencida',
+          mensaje: 'Tu suscripción ha expirado. Renueva ahora para seguir usando Zitapp.',
+          mostrar: true
+        };
+      case 'proximo':
+        return {
+          color: 'bg-yellow-500',
+          icono: '⏰',
+          titulo: 'Renovación Próxima',
+          mensaje: 'Tu suscripción vence pronto. Renueva ahora sin interrupciones.',
+          mostrar: true
+        };
+      case 'activo':
+        return {
+          color: 'bg-green-500',
+          icono: '✅',
+          titulo: 'Suscripción Activa',
+          mensaje: 'Tu suscripción está activa. ¿Quieres cambiar de plan?',
+          mostrar: true
+        };
+      default:
+        return { mostrar: false };
+    }
+  };
 
   const formatearPrecio = (precio: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -168,29 +273,8 @@ export default function PlanesPage() {
 
   const handleSeleccionarPlan = async (planId: string) => {
     console.log('Plan seleccionado:', planId);
-    console.log('Con notificaciones:', notificacionesSeleccionadas[planId]);
-    
-    console.log('=== DEBUGGING STORAGE ===');
-    console.log('sessionStorage.renewalData:', sessionStorage.getItem('renewalData'));
-    console.log('localStorage.pendingActivation:', localStorage.getItem('pendingActivation'));
-    console.log('========================');
-    
-    // NUEVO: Verificar si hay datos de renovación
-    // NUEVO: Verificar si hay datos de renovación
-      const renewalData = sessionStorage.getItem('renewalData');
-      let userDataFromRenewal = null;
-
-      if (renewalData) {
-        const renewal = JSON.parse(renewalData);
-        userDataFromRenewal = {
-          email: renewal.email,
-          nombre: renewal.email.split('@')[0],
-          telefono: ''
-        };
-        sessionStorage.removeItem('renewalData');
-        console.log('Datos de renovación encontrados:', userDataFromRenewal);
-      }
-
+    console.log('Estado usuario:', estadoUsuario);
+    console.log('Datos renovación:', datosRenovacion);
     
     // Validar términos y condiciones
     if (!aceptaTerminos) {
@@ -212,34 +296,35 @@ export default function PlanesPage() {
     // Verificar si hay usuario autenticado
     const { data } = await supabase.auth.getSession();
     
-    if (data.session) {
-      // Usuario autenticado - usar datos de renovación si existen, sino obtener de BD
-      if (userDataFromRenewal) {
-        // Usar datos de renovación
-        await procesarPago(planId, planConNotificaciones, userDataFromRenewal);
-      } else {
-        // Obtener datos del usuario autenticado (código original)
-        try {
-          const { data: cliente } = await supabase
-            .from('clientes')
-            .select('*')
-            .eq('user_id', data.session.user.id)
-            .single();
+    if (data.session && datosRenovacion) {
+      // Usuario logueado con datos de renovación - usar esos datos
+      await procesarPago(planId, planConNotificaciones, {
+        email: datosRenovacion.email,
+        nombre: datosRenovacion.nombre,
+        telefono: ''
+      });
+    } else if (data.session) {
+      // Usuario logueado sin datos de renovación - obtener de BD
+      try {
+        const { data: cliente } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('user_id', data.session.user.id)
+          .single();
 
-          if (cliente) {
-            await procesarPago(planId, planConNotificaciones, {
-              email: cliente.correo,
-              nombre: cliente.nombre,
-              telefono: cliente.telefono || ''
-            });
-          }
-        } catch (error) {
-          console.error('Error obteniendo datos del cliente:', error);
-          setMostrarModal(true);
+        if (cliente) {
+          await procesarPago(planId, planConNotificaciones, {
+            email: cliente.correo,
+            nombre: cliente.nombre,
+            telefono: cliente.telefono || ''
+          });
         }
+      } catch (error) {
+        console.error('Error obteniendo datos del cliente:', error);
+        setMostrarModal(true);
       }
     } else {
-      // Usuario no autenticado - mostrar modal para capturar datos
+      // Usuario no autenticado - mostrar modal
       setMostrarModal(true);
     }
   };
@@ -295,7 +380,6 @@ export default function PlanesPage() {
 
       if (response.ok && data.payment_link) {
         console.log('Redirigiendo a Wompi:', data.payment_link);
-        // Redirigir a Wompi
         window.location.href = data.payment_link;
       } else {
         console.error('Error response:', data);
@@ -307,7 +391,6 @@ export default function PlanesPage() {
     } catch (error) {
       console.error('Error al procesar pago:', error);
       alert('Error al procesar el pago: ' + (error as Error).message);
-      // Limpiar localStorage en caso de error
       localStorage.removeItem('pendingActivation');
     } finally {
       setProcesandoPago(false);
@@ -324,7 +407,6 @@ export default function PlanesPage() {
       return;
     }
 
-    // Validar términos y condiciones
     if (!aceptaTerminos) {
       alert('Debes aceptar los términos y condiciones para continuar');
       return;
@@ -376,6 +458,23 @@ export default function PlanesPage() {
           </p>
         </motion.div>
 
+        {/* Banner de estado del usuario */}
+        {estadoUsuario && obtenerBannerEstado().mostrar && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`${obtenerBannerEstado().color} text-white p-4 rounded-xl mb-8 text-center shadow-lg`}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-2xl">{obtenerBannerEstado().icono}</span>
+              <div>
+                <h3 className="font-bold text-lg">{obtenerBannerEstado().titulo}</h3>
+                <p className="text-white/90">{obtenerBannerEstado().mensaje}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Planes */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {planes.map((plan, index) => (
@@ -394,7 +493,6 @@ export default function PlanesPage() {
               {plan.populares && (
                 <motion.div
                   className="absolute -top-3 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.8 }}
@@ -486,7 +584,6 @@ export default function PlanesPage() {
                     <span className="font-bold text-blue-600">+{formatearPrecio(getAddonNotificaciones(plan.id).precio)}/mes</span>
                   </div>
                   
-                  {/* Mostrar siempre los beneficios */}
                   <div className="space-y-2">
                     <ul className="text-xs text-gray-600 space-y-1">
                       {getAddonNotificaciones(plan.id).caracteristicas.map((item, idx) => (
@@ -509,9 +606,8 @@ export default function PlanesPage() {
                   </div>
                 </div>
 
-                {/* Términos y Condiciones - agregar antes del botón */}
-                
-                  {mounted && (
+                {/* Términos y Condiciones */}
+                {mounted && (
                   <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <input
                       type="checkbox"

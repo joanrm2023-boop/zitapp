@@ -64,7 +64,7 @@ export default function DashboardCliente() {
         // Obtener información del cliente usando user_id
         const { data: clienteData, error: clienteError } = await supabase
           .from('clientes')
-          .select('id_cliente, nombre, fecha_vencimiento_plan')
+          .select('id_cliente, nombre, fecha_vencimiento_plan, correo, user_id')
           .eq('user_id', user.id)
           .single()
 
@@ -285,8 +285,18 @@ export default function DashboardCliente() {
             
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => router.push('/planes')}
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2 border border-white/30"
+                onClick={() => {
+                  // Guardar datos del usuario actual para la renovación
+                  const renovacionData = {
+                    email: cliente?.correo || '', // Necesitarías añadir correo al select del cliente
+                    planId: 'pendiente',
+                    userId: cliente?.user_id || '',
+                    esRenovacion: true
+                  }
+                  localStorage.setItem('renovacionData', JSON.stringify(renovacionData))
+                  router.push('/planes')
+                }}
+                className="bg-white/20 hover:bg-white/30..."
               >
                 <span>Renovar Plan</span>
                 <ChevronRight className="w-4 h-4" />
