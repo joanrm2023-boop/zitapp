@@ -170,6 +170,11 @@ export default function PlanesPage() {
     console.log('Plan seleccionado:', planId);
     console.log('Con notificaciones:', notificacionesSeleccionadas[planId]);
     
+    console.log('=== DEBUGGING STORAGE ===');
+    console.log('sessionStorage.renewalData:', sessionStorage.getItem('renewalData'));
+    console.log('localStorage.pendingActivation:', localStorage.getItem('pendingActivation'));
+    console.log('========================');
+    
     // NUEVO: Verificar si hay datos de renovación
     // NUEVO: Verificar si hay datos de renovación
       const renewalData = sessionStorage.getItem('renewalData');
