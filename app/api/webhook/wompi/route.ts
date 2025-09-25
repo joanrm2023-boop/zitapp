@@ -64,19 +64,71 @@ async function handleTransactionUpdate(transaction: any) {
       return;
     }
 
+    console.log('=== PROCESANDO WEBHOOK TRANSACCIÓN ===');
+    console.log('Reference:', reference);
+    console.log('Status:', status);
+    console.log('Transacción encontrada:', {
+      id: transaccion.id,
+      user_id: transaccion.user_id,
+      plan_id: transaccion.plan_id,
+      user_email: transaccion.user_email,
+      notificaciones_incluidas: transaccion.notificaciones_incluidas
+    });
+
+    // Verificar que tenemos user_id
+    let userId = transaccion.user_id;
+    
+    // Si no tenemos user_id, buscarlo por email
+    if (!userId && transaccion.user_email) {
+      console.log('User ID no encontrado, buscando por email:', transaccion.user_email);
+      
+      const { data: cliente, error: clienteError } = await supabase
+        .from('clientes')
+        .select('id_cliente')
+        .eq('correo', transaccion.user_email)
+        .single();
+
+      if (!clienteError && cliente) {
+        userId = cliente.id_cliente;
+        console.log('User ID encontrado por email:', userId);
+        
+        // Actualizar la transacción con el user_id correcto
+        await supabase
+          .from('transacciones_pendientes')
+          .update({ user_id: userId })
+          .eq('id', transaccion.id);
+      } else {
+        console.error('No se pudo encontrar cliente por email:', transaccion.user_email);
+      }
+    }
+
     // Actualizar estado de la transacción
+    const updateData: any = {
+      status: status,
+      completed_at: new Date().toISOString()
+    };
+
+    // Si ahora tenemos user_id, incluirlo en la actualización
+    if (userId) {
+      updateData.user_id = userId;
+    }
+
     await supabase
       .from('transacciones_pendientes')
-      .update({
-        status: status,
-        completed_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('wompi_reference', reference);
 
+    console.log('Estado de transacción actualizado:', status);
+
     // Si el pago fue aprobado, activar la suscripción
-    if (status === 'APPROVED') {
-      await activateSubscription(transaccion.user_id, transaccion.plan_id);
+    if (status === 'APPROVED' && userId) {
+      console.log('Pago aprobado, activando suscripción para user:', userId);
+      await activateSubscription(userId, transaccion.plan_id, transaccion.notificaciones_incluidas);
+    } else if (status === 'APPROVED' && !userId) {
+      console.error('Pago aprobado pero no se pudo determinar el user_id');
     }
+
+    console.log('=== FIN PROCESAMIENTO WEBHOOK ===');
 
   } catch (error) {
     console.error('Error handling transaction update:', error);
@@ -181,11 +233,19 @@ async function handleSubscriptionPaymentFailed(subscription: any) {
   }
 }
 
-async function activateSubscription(userId: string, planId: string) {
+async function activateSubscription(userId: string, planId: string, notificacionesIncluidas: boolean = false) {
   try {
-    // Calcular fecha de vencimiento (1 mes desde ahora)
+    console.log('=== ACTIVANDO SUSCRIPCIÓN ===');
+    console.log('User ID:', userId);
+    console.log('Plan ID:', planId);
+    console.log('Notificaciones incluidas:', notificacionesIncluidas);
+
+    // Calcular fecha de vencimiento (30 días desde ahora)
     const fechaVencimiento = new Date();
-    fechaVencimiento.setMonth(fechaVencimiento.getMonth() + 1);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+    const fechaVencimientoISO = fechaVencimiento.toISOString();
+
+    console.log('Fecha de vencimiento:', fechaVencimientoISO);
 
     // Actualizar el cliente para activar su suscripción
     const { error } = await supabase
@@ -193,17 +253,36 @@ async function activateSubscription(userId: string, planId: string) {
       .update({
         suscripcion_activa: true,
         estado_suscripcion: 'activa',
-        fecha_vencimiento_plan: fechaVencimiento.toISOString(),
+        fecha_vencimiento_plan: fechaVencimientoISO,
         activo: 'Activo',
         plan: planId,
+        notificaciones_activas: notificacionesIncluidas,
         fecha_cambio_estado: new Date().toISOString()
       })
       .eq('id_cliente', userId);
 
     if (error) {
-      console.error('Error activating subscription:', error);
+      console.error('Error activating subscription:', JSON.stringify(error, null, 2));
     } else {
-      console.log('Subscription activated for user:', userId);
+      console.log('Subscription activated successfully for user:', userId);
+      
+      // Verificar la activación
+      const { data: clienteVerificacion, error: verError } = await supabase
+        .from('clientes')
+        .select('activo, suscripcion_activa, estado_suscripcion, plan, notificaciones_activas, fecha_vencimiento_plan')
+        .eq('id_cliente', userId)
+        .single();
+      
+      if (!verError && clienteVerificacion) {
+        console.log('=== VERIFICACIÓN ACTIVACIÓN ===');
+        console.log('Estado:', clienteVerificacion.activo);
+        console.log('Suscripción activa:', clienteVerificacion.suscripcion_activa);
+        console.log('Estado suscripción:', clienteVerificacion.estado_suscripcion);
+        console.log('Plan:', clienteVerificacion.plan);
+        console.log('Notificaciones activas:', clienteVerificacion.notificaciones_activas);
+        console.log('Fecha vencimiento:', clienteVerificacion.fecha_vencimiento_plan);
+        console.log('=== FIN VERIFICACIÓN ===');
+      }
     }
   } catch (error) {
     console.error('Error in activateSubscription:', error);
