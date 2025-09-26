@@ -753,7 +753,7 @@ function ReservarSlugContent() {
                 value={fecha}
                 onChange={handleFechaChange}
                 min={hoy}
-                className="text-gray-800 border border-gray-300 rounded-lg py-2 px-2.5 pr-4 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full text-sm h-10"
+                className="text-gray-800 border border-gray-300 rounded-lg p-3 pr-4 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full text-sm"
                 style={{
                   colorScheme: 'light',
                 }}
@@ -779,7 +779,7 @@ function ReservarSlugContent() {
             <select
               value={barberoSeleccionado}
               onChange={handleBarberoChange}
-              className="text-gray-800 border border-gray-300 rounded-lg p-2.5 pr-10 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full appearance-none text-sm"
+              className="text-gray-800 border border-gray-300 rounded-lg p-3 pr-10 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full appearance-none text-sm"
             >
               <option value="">Selecciona un Profesional</option>
               {barberos.map((barbero: any) => (
