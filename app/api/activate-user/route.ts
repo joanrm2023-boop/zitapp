@@ -57,10 +57,33 @@ export async function POST(request: NextRequest) {
       console.log('Error buscando transacción (continuando sin notificaciones):', error);
     }
 
-    // Calcular fecha de vencimiento (30 días desde hoy)
-    const fechaVencimiento = new Date();
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-    const fechaVencimientoISO = fechaVencimiento.toISOString();
+    // Renovación inteligente: distingue entre trial y suscripción pagada
+      console.log('Estado de suscripción actual:', cliente.estado_suscripcion);
+      console.log('Fecha de vencimiento actual del cliente:', cliente.fecha_vencimiento_plan);
+
+      let fechaVencimiento;
+      if (cliente.fecha_vencimiento_plan && cliente.estado_suscripcion !== 'trial') {
+        // Solo usar renovación aditiva si NO está en trial (es suscripción pagada)
+        fechaVencimiento = new Date(cliente.fecha_vencimiento_plan);
+        const hoy = new Date();
+        
+        if (fechaVencimiento < hoy) {
+          console.log('Suscripción pagada ya vencida, iniciando desde hoy');
+          fechaVencimiento = new Date();
+        } else {
+          console.log('Renovación de suscripción pagada, manteniendo días restantes');
+        }
+      } else {
+        // Cliente en trial, nuevo, o primera compra → siempre desde hoy
+        console.log('Primera compra o fin de trial, iniciando desde hoy');
+        fechaVencimiento = new Date();
+      }
+
+      // Agregar 30 días desde la fecha base
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      const fechaVencimientoISO = fechaVencimiento.toISOString();
+
+      console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoISO);
 
     // Una sola actualización completa que cumple con todas las validaciones RLS
       const { error: updateError } = await supabase

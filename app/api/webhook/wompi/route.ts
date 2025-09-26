@@ -240,12 +240,37 @@ async function activateSubscription(userId: string, planId: string, notificacion
     console.log('Plan ID:', planId);
     console.log('Notificaciones incluidas:', notificacionesIncluidas);
 
-    // Calcular fecha de vencimiento (30 días desde ahora)
-    const fechaVencimiento = new Date();
+    // Obtener datos del cliente para renovación aditiva
+    const { data: clienteInfo, error: clienteError } = await supabase
+      .from('clientes')
+      .select('fecha_vencimiento_plan, estado_suscripcion')
+      .eq('id_cliente', userId)
+      .single();
+
+    console.log('Estado de suscripción:', clienteInfo?.estado_suscripcion);
+    console.log('Fecha de vencimiento actual del cliente:', clienteInfo?.fecha_vencimiento_plan);
+
+    let fechaVencimiento;
+    if (clienteInfo?.fecha_vencimiento_plan && clienteInfo?.estado_suscripcion !== 'trial') {
+      // Solo usar renovación aditiva si NO está en trial
+      fechaVencimiento = new Date(clienteInfo.fecha_vencimiento_plan);
+      const hoy = new Date();
+      
+      if (fechaVencimiento < hoy) {
+        console.log('Suscripción pagada ya vencida, iniciando desde hoy');
+        fechaVencimiento = new Date();
+      } else {
+        console.log('Renovación de suscripción pagada, manteniendo días restantes');
+      }
+    } else {
+      console.log('Primera compra o fin de trial, iniciando desde hoy');
+      fechaVencimiento = new Date();
+    }
+
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
     const fechaVencimientoISO = fechaVencimiento.toISOString();
 
-    console.log('Fecha de vencimiento:', fechaVencimientoISO);
+    console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoISO);
 
     // Actualizar el cliente para activar su suscripción
     const { error } = await supabase
