@@ -26,7 +26,7 @@ const planes = [
       'Historial de ventas completo',
       'Enlaces de reserva personalizados',
       'Configuración de horarios flexible',
-      'Soporte por email'
+      'Soporte'
     ],
     color: 'from-blue-500 to-blue-600',
     textColor: 'text-blue-600',
@@ -47,10 +47,9 @@ const planes = [
       'Gestión de múltiples profesionales',
       'Asignación automática de citas',
       'Reportes de ventas por profesional',
-      'Control de horarios individuales',
-      'Dashboard multi-usuario',
-      'Estadísticas avanzadas por equipo',
-      'Soporte prioritario'
+      'Control de horarios',
+      'Estadísticas',
+      'Soporte'
     ],
     color: 'from-purple-500 to-purple-600',
     textColor: 'text-purple-600',
@@ -69,12 +68,10 @@ const planes = [
     caracteristicas: [
       'Todo lo del plan Pro',
       'Gestión empresarial completa',
-      'Roles y permisos avanzados',
-      'Reportes ejecutivos detallados',
-      'Análisis de rendimiento por profesional',
-      'API para integraciones personalizadas',
+      'Reportes ',
+      'Análisis de rendimiento',
       'Backup automático diario',
-      'Soporte dedicado 24/7'
+      'Soporte'
     ],
     color: 'from-orange-500 to-orange-600',
     textColor: 'text-orange-600',
@@ -86,8 +83,8 @@ const planes = [
 const getAddonNotificaciones = (planId: string) => {
   const precios: Record<string, number> = {
     'basico': 8000,
-    'pro': 12000,
-    'premium': 18000
+    'pro': 16000,
+    'premium': 25000
   };
 
   return {
@@ -98,7 +95,6 @@ const getAddonNotificaciones = (planId: string) => {
       'Email de confirmación automático al agendar',
       'Templates profesionales personalizados',
       'Entrega instantánea y confiable',
-      'Reducción de no-shows',
       'Mejora la imagen profesional'
     ]
   };
