@@ -743,31 +743,64 @@ function ReservarSlugContent() {
           />
           {errorNota && <p className="text-red-500 text-sm mt-1">{errorNota}</p>}
 
-          <input
-            type="date"
-            value={fecha}
-            onChange={handleFechaChange}
-            min={hoy}
-            className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          {errorFecha && <p className="text-red-500 text-sm mt-1">{errorFecha}</p>}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha de tu cita
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                value={fecha}
+                onChange={handleFechaChange}
+                min={hoy}
+                className="text-gray-800 border border-gray-300 rounded-lg p-3 pr-4 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full"
+                style={{
+                  colorScheme: 'light',
+                }}
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 pointer-events-none">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+            {errorFecha && <p className="text-red-500 text-sm mt-1">{errorFecha}</p>}
+            {!fecha && (
+              <p className="text-sm text-gray-500 mt-1">Por favor selecciona una fecha</p>
+            )}
+          </div>
 
-          {!fecha && (
-            <p className="text-sm text-gray-500 mt-1">Por favor selecciona una fecha</p>
-          )}
-
-          <select
-            value={barberoSeleccionado}
-            onChange={handleBarberoChange}
-            className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="">Selecciona un Profesional</option>
-            {barberos.map((barbero: any) => (
-              <option key={barbero.id_barbero} value={barbero.id_barbero}>
-                {barbero.nombre_barbero}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Profesional que te atenderá
+            </label>
+            <div className="relative">
+              <select
+                value={barberoSeleccionado}
+                onChange={handleBarberoChange}
+                className="text-gray-800 border border-gray-300 rounded-lg p-3 pr-10 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full appearance-none"
+              >
+                <option value="">Selecciona un Profesional</option>
+                {barberos.map((barbero: any) => (
+                  <option key={barbero.id_barbero} value={barbero.id_barbero}>
+                    {barbero.nombre_barbero}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 pointer-events-none">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Selecciona una hora:</label>
