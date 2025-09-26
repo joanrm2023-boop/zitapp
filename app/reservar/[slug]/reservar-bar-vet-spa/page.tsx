@@ -753,10 +753,8 @@ function ReservarSlugContent() {
                   value={fecha}
                   onChange={handleFechaChange}
                   min={hoy}
-                  className="w-full max-w-full text-gray-800 border border-gray-300 rounded-lg p-3 pl-10 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-sm"
-                  style={{
-                    colorScheme: 'light',
-                  }}
+                  className="w-full max-w-full appearance-none text-gray-800 border border-gray-300 rounded-lg h-[44px] px-3 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-sm"
+                  style={{ colorScheme: 'light' }}
                 />
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 pointer-events-none">
                   <svg
