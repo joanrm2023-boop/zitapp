@@ -53,16 +53,11 @@ export default function Home() {
               >
                 Comenzar ahora gratis
               </a>
-              <a 
-                href="/reservar/demo"
-                className="border border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-colors"
-              >
-                Ver demo
-              </a>
+              
             </div>
             
             <p className="text-sm text-gray-500 mt-4">
-              Sin tarjeta de crédito • Configuración en 5 minutos
+              Configuración en 5 minutos
             </p>
           </div>
         </div>
@@ -519,7 +514,7 @@ export default function Home() {
                 Comenzar prueba gratuita
               </a>
               <a 
-                href="https://wa.me/573152720293?text=Hola,%20me%20interesa%20conocer%20más%20sobre%20Zitapp%20para%20mi%20barbería"
+                href="https://wa.me/573001334528?text=Hola,%20me%20interesa%20conocer%20más%20sobre%20Zitapp%20para%20mi%20barbería"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="border border-white text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/10 transition-colors"
@@ -573,8 +568,8 @@ export default function Home() {
             <div>
               <h4 className="font-semibold mb-4">Soporte</h4>
               <div className="space-y-2 text-gray-400">
-                <div><a href="https://wa.me/573152720293?text=Hola,%20necesito%20ayuda%20con%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto</a></div>
-                <div><a href="https://wa.me/573152720293?text=Hola,%20tengo%20una%20pregunta%20sobre%20el%20uso%20de%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Centro de ayuda</a></div>
+                <div><a href="https://wa.me/573001334528?text=Hola,%20necesito%20ayuda%20con%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto</a></div>
+                <div><a href="https://wa.me/573001334528?text=Hola,%20tengo%20una%20pregunta%20sobre%20el%20uso%20de%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Centro de ayuda</a></div>
               </div>
             </div>
             
