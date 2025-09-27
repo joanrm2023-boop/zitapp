@@ -486,7 +486,7 @@ export default function Home() {
           </div>
           
           <a 
-            href="/planes" 
+            href="/planes-nuevos" 
             className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors"
           >
             Ver todos los planes

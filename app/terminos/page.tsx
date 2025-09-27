@@ -160,8 +160,9 @@ export default function TerminosPage() {
                   pero conservaremos tus datos por 30 días adicionales.
                 </p>
                 <p>
-                  <strong>Política de reembolsos:</strong> Ofrecemos reembolsos completos dentro de los primeros 
-                  7 días de cualquier período de facturación, sin preguntas.
+                  <strong>Política de reembolsos:</strong> No ofrecemos reembolsos una vez que eliges un plan pagado, 
+                    ya que proporcionamos un período de prueba gratuito de 15 días para que evalúes 
+                    completamente el servicio antes de comprometerte con un pago.
                 </p>
               </div>
             </section>
@@ -249,6 +250,23 @@ export default function TerminosPage() {
                 </p>
                 <p>
                   Responderemos a todas las consultas dentro de 24 horas en días hábiles.
+                </p>
+              </div>
+            </section>
+            
+            {/* Sección 10: Planes y Pagos */}
+            <section>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Suspensión por falta de pago</h3>
+              <div className="text-gray-700 space-y-3 pl-4">
+                <p>
+                  Tu cuenta será suspendida inmediatamente tras el vencimiento de tu suscripción. 
+                  Después de 60 días consecutivos sin reactivar tu suscripción, tu cuenta será 
+                  marcada como cancelada definitivamente.
+                </p>
+                <p>
+                  Durante el período de suspensión, conservaremos tus datos de forma segura. 
+                  Una vez marcada como cancelada, la reactivación requerirá contacto directo 
+                  con nuestro equipo de soporte.
                 </p>
               </div>
             </section>
