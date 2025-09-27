@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Star, Users, Crown, Zap, ArrowLeft, Phone, Globe, Shield, Award, Clock, Smartphone, Building, TrendingUp } from 'lucide-react';
+import { Check, Star, Users, Crown, Zap, ArrowLeft, Mail, Globe, Shield, Award, Clock, Smartphone, Building, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import React from "react";
@@ -75,6 +75,19 @@ const planes = [
     borderColor: 'border-orange-200'
   }
 ];
+
+// Addon de notificaciones - precios por plan
+const getAddonNotificaciones = (planId: string) => {
+  const precios: Record<string, number> = {
+    'basico': 8000,
+    'pro': 16000,
+    'premium': 25000
+  };
+
+  return {
+    precio: precios[planId] || 8000
+  };
+};
 
 // Mapeo de iconos
 const iconMap: Record<string, React.ReactNode> = {
@@ -256,27 +269,43 @@ export default function PlanesNuevosPage() {
                   ))}
                 </ul>
 
-                {/* Información sobre notificaciones */}
-                <div className="mb-6 p-4 border-2 border-dashed border-gray-200 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Phone className="w-5 h-5 text-blue-500" />
-                    <span className="font-medium text-gray-900">Notificaciones Automáticas</span>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Opcional</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Agrega emails profesionales automáticos para tus clientes por solo unos pesos adicionales
-                  </p>
-                </div>
+                {/* Información completa sobre notificaciones */}
+                    <div className="mb-6 p-4 border-2 border-dashed border-gray-200 rounded-xl bg-blue-50">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Mail className="w-5 h-5 text-blue-500" />
+                        <span className="font-medium text-gray-900">Emails profesionales automáticos</span>
+                        <span className="font-bold text-blue-600">
+                        +{formatearPrecio(getAddonNotificaciones(plan.id).precio)}/mes
+                        </span>
+                    </div>
+                    
+                    <ul className="text-xs text-gray-600 space-y-1">
+                        <li className="flex items-center gap-2">
+                        <Check size={12} className="text-blue-500" />
+                        <span>Email de confirmación automático al agendar</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                        <Check size={12} className="text-blue-500" />
+                        <span>Templates profesionales personalizados</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                        <Check size={12} className="text-blue-500" />
+                        <span>Entrega instantánea y confiable</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                        <Check size={12} className="text-blue-500" />
+                        <span>Mejora la imagen profesional</span>
+                        </li>
+                    </ul>
+                    
+                    <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+                        <p className="text-xs text-blue-700 font-medium">
+                        Addon opcional: Agrega notificaciones profesionales a tu plan
+                        </p>
+                    </div>
+                    </div>
 
-                {/* Botón sin funcionalidad de pago */}
-                <motion.div
-                  className="w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 bg-gray-100 text-gray-500 text-center cursor-not-allowed"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  Regístrate para acceder
-                </motion.div>
+                
               </div>
             </motion.div>
           ))}
