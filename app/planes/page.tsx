@@ -43,12 +43,12 @@ const planes = [
     ahorro: 'Ahorra hasta 56%',
     icono: 'Star',
     caracteristicas: [
-      'Todo lo del plan Básico',
-      'Gestión de múltiples profesionales',
-      'Asignación automática de citas',
-      'Reportes de ventas por profesional',
-      'Control de horarios',
-      'Estadísticas',
+      'Dashboard completo con métricas',
+      'Gestión de servicios (agregar/eliminar)',
+      'Sistema de reservas inteligente',
+      'Historial de ventas completo',
+      'Enlaces de reserva personalizados',
+      'Configuración de horarios flexible',
       'Soporte'
     ],
     color: 'from-purple-500 to-purple-600',
@@ -66,11 +66,12 @@ const planes = [
     ahorro: 'Ahorra hasta 75%',
     icono: 'Crown',
     caracteristicas: [
-      'Todo lo del plan Pro',
-      'Gestión empresarial completa',
-      'Reportes ',
-      'Análisis de rendimiento',
-      'Backup automático diario',
+      'Dashboard completo con métricas',
+      'Gestión de servicios (agregar/eliminar)',
+      'Sistema de reservas inteligente',
+      'Historial de ventas completo',
+      'Enlaces de reserva personalizados',
+      'Configuración de horarios flexible',
       'Soporte'
     ],
     color: 'from-orange-500 to-orange-600',
@@ -528,13 +529,23 @@ export default function PlanesPage() {
                   <span className="text-white/80">/mes</span>
                 </div>
 
-                <div className="text-white/90 text-sm mt-1">
-                  {plan.profesionales}
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mt-4 border border-white/30">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Users className="w-5 h-5 text-white" />
+                    <span className="text-white font-bold text-lg">{plan.profesionales}</span>
+                  </div>
+                  <div className="text-white/80 text-xs text-center">
+                    {plan.maxProfesionales === 1 ? 'Ideal para independientes' : 
+                    plan.maxProfesionales <= 4 ? 'Perfecto para equipos pequeños' : 
+                    'Diseñado para empresas grandes'}
+                  </div>
                 </div>
 
                 {plan.maxProfesionales > 1 && (
-                  <div className="text-white/80 text-xs mt-2">
-                    Desde {calcularPrecioPorProfesional(calcularPrecioTotal(plan.id), plan.maxProfesionales)} por profesional
+                  <div className="bg-white/15 rounded-lg p-2 mt-3">
+                    <div className="text-white/90 text-xs font-medium text-center">
+                      💰 Solo {calcularPrecioPorProfesional(calcularPrecioTotal(plan.id), plan.maxProfesionales)} por profesional
+                    </div>
                   </div>
                 )}
               </div>
