@@ -256,7 +256,7 @@ export default function TerminosPage() {
             
             {/* Sección 10: Planes y Pagos */}
             <section>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Suspensión por falta de pago</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3"> Suspensión por falta de pago</h3>
               <div className="text-gray-700 space-y-3 pl-4">
                 <p>
                   Tu cuenta será suspendida inmediatamente tras el vencimiento de tu suscripción. 

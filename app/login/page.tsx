@@ -14,6 +14,13 @@ export default function LoginPage() {
   const [trialExpirado, setTrialExpirado] = useState(false)
   const [diasRestantes, setDiasRestantes] = useState(0)
   
+  // Nuevos estados para recordar clave
+  const [mostrarRecuperacion, setMostrarRecuperacion] = useState(false)
+  const [emailRecuperacion, setEmailRecuperacion] = useState('')
+  const [mensajeRecuperacion, setMensajeRecuperacion] = useState('')
+  const [errorRecuperacion, setErrorRecuperacion] = useState('')
+  const [enviandoRecuperacion, setEnviandoRecuperacion] = useState(false)
+
   // Nuevos estados para modal de advertencia
   const [mostrarModalAdvertencia, setMostrarModalAdvertencia] = useState(false)
   const [diasParaVencer, setDiasParaVencer] = useState(0)
@@ -236,6 +243,33 @@ export default function LoginPage() {
     }
   }
 
+  const handleRecuperarPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEnviandoRecuperacion(true)
+    setErrorRecuperacion('')
+    setMensajeRecuperacion('')
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperacion, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+
+      if (error) {
+        setErrorRecuperacion(error.message)
+      } else {
+        setMensajeRecuperacion('Te enviamos un correo con instrucciones para restablecer tu contraseña')
+        setTimeout(() => {
+          setMostrarRecuperacion(false)
+          setEmailRecuperacion('')
+        }, 3000)
+      }
+    } catch (error) {
+      setErrorRecuperacion('Error al enviar el correo de recuperación')
+    } finally {
+      setEnviandoRecuperacion(false)
+    }
+  }
+
   // Función para obtener el mensaje del modal según días restantes
   const obtenerMensajeModal = (dias) => {
     if (dias === 1) return 'Tu suscripción vence mañana'
@@ -373,6 +407,17 @@ export default function LoginPage() {
               required
             />
 
+            {/* Botón de olvidaste contraseña */}
+            <div className="text-right -mt-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setMostrarRecuperacion(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
             <motion.button
               type="submit"
               disabled={loading}
@@ -458,6 +503,76 @@ export default function LoginPage() {
           © {new Date().getFullYear()} Zitapp — Reservas Inteligentes
         </motion.p>
       </motion.div>
+      
+      {/* Modal de Recuperación de Contraseña */}
+        {mostrarRecuperacion && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl relative"
+            >
+              {/* Botón cerrar */}
+              <button
+                onClick={() => {
+                  setMostrarRecuperacion(false)
+                  setEmailRecuperacion('')
+                  setErrorRecuperacion('')
+                  setMensajeRecuperacion('')
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                Recuperar Contraseña
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.
+              </p>
+
+              {mensajeRecuperacion && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg text-green-700 text-sm">
+                  {mensajeRecuperacion}
+                </div>
+              )}
+
+              {errorRecuperacion && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm">
+                  {errorRecuperacion}
+                </div>
+              )}
+
+              <form onSubmit={handleRecuperarPassword} className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={emailRecuperacion}
+                  onChange={(e) => setEmailRecuperacion(e.target.value)}
+                  className="w-full text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={enviandoRecuperacion}
+                  className={`w-full py-3 rounded-lg font-semibold transition-all ${
+                    enviandoRecuperacion
+                      ? 'bg-blue-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  } text-white`}
+                >
+                  {enviandoRecuperacion ? 'Enviando...' : 'Enviar Instrucciones'}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
 
       {/* Modal de Advertencia de Vencimiento */}
       {mostrarModalAdvertencia && (
