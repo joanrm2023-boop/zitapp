@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Calendar, Settings, Store, Link2, Copy, Globe, TrendingUp, CreditCard, Upload } from 'lucide-react';
+import { Clock, Lock, Eye, EyeOff, Calendar, Settings, Store, Link2, Copy, Globe, TrendingUp, CreditCard, Upload } from 'lucide-react';
 import toast from "react-hot-toast";
 
 const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
@@ -24,6 +24,16 @@ export default function MiNegocioPage() {
   const [intervaloInvalido, setIntervaloInvalido] = useState(false);
   const [mensajeVisible, setMensajeVisible] = useState(false);
   const [subiendoLogo, setSubiendoLogo] = useState(false);
+
+  // Estados para el modal de cambio de contraseña
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [contrasenaActual, setContrasenaActual] = useState('');
+  const [contrasenaNueva, setContrasenaNueva] = useState('');
+  const [contrasenaConfirmar, setContrasenaConfirmar] = useState('');
+  const [mostrarActual, setMostrarActual] = useState(false);
+  const [mostrarNueva, setMostrarNueva] = useState(false);
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+  const [cambiandoContrasena, setCambiandoContrasena] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -264,6 +274,75 @@ export default function MiNegocioPage() {
     }
   };
 
+  const handleCambiarContrasena = async () => {
+    // Validaciones
+    if (!contrasenaActual || !contrasenaNueva || !contrasenaConfirmar) {
+      toast.error("Por favor completa todos los campos");
+      return;
+    }
+
+    if (contrasenaNueva.length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    if (contrasenaNueva !== contrasenaConfirmar) {
+      toast.error("Las contraseñas nuevas no coinciden");
+      return;
+    }
+
+    if (contrasenaActual === contrasenaNueva) {
+      toast.error("La nueva contraseña debe ser diferente a la actual");
+      return;
+    }
+
+    setCambiandoContrasena(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user?.email) {
+        toast.error("No se pudo obtener el usuario actual");
+        return;
+      }
+
+      // Verificar contraseña actual
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: contrasenaActual,
+      });
+
+      if (signInError) {
+        toast.error("La contraseña actual es incorrecta");
+        return;
+      }
+
+      // Actualizar contraseña
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: contrasenaNueva
+      });
+
+      if (updateError) {
+        toast.error("Error al cambiar la contraseña: " + updateError.message);
+        return;
+      }
+
+      toast.success("✅ Contraseña actualizada correctamente");
+      
+      // Limpiar y cerrar modal
+      setContrasenaActual('');
+      setContrasenaNueva('');
+      setContrasenaConfirmar('');
+      setModalAbierto(false);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Error inesperado al cambiar la contraseña");
+    } finally {
+      setCambiandoContrasena(false);
+    }
+  };
+
   // Calcular estadísticas
   const diasDisponibles = diasSemana.length - diasNoDisponibles.length;
   const horasDisponiblesPorDia = convertirAHoras(rangoFin) - convertirAHoras(rangoInicio);
@@ -367,6 +446,17 @@ export default function MiNegocioPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Botón Cambiar Contraseña - Fuera del grid */}
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => setModalAbierto(true)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition flex items-center gap-2"
+              >
+                <Lock size={18} />
+                Cambiar Contraseña
+              </button>
             </div>
 
             {/* SECCIÓN DE LOGO ACTUALIZADA */}
@@ -591,7 +681,126 @@ export default function MiNegocioPage() {
           </button>
         </>
       )}
+
+      {/* Modal de cambio de contraseña */}
+        {modalAbierto && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-lg p-6 max-w-md w-full"
+            >
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Lock size={22} />
+                Cambiar Contraseña
+              </h3>
+
+              <div className="space-y-4">
+                {/* Contraseña actual */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Contraseña actual
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={mostrarActual ? "text" : "password"}
+                      value={contrasenaActual}
+                      onChange={(e) => setContrasenaActual(e.target.value)}
+                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarActual(!mostrarActual)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                    >
+                      {mostrarActual ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nueva contraseña */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={mostrarNueva ? "text" : "password"}
+                      value={contrasenaNueva}
+                      onChange={(e) => setContrasenaNueva(e.target.value)}
+                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarNueva(!mostrarNueva)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                    >
+                      {mostrarNueva ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
+                </div>
+
+                {/* Confirmar contraseña */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirmar nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={mostrarConfirmar ? "text" : "password"}
+                      value={contrasenaConfirmar}
+                      onChange={(e) => setContrasenaConfirmar(e.target.value)}
+                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarConfirmar(!mostrarConfirmar)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                    >
+                      {mostrarConfirmar ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones del modal */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setModalAbierto(false);
+                    setContrasenaActual('');
+                    setContrasenaNueva('');
+                    setContrasenaConfirmar('');
+                  }}
+                  disabled={cambiandoContrasena}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCambiarContrasena}
+                  disabled={cambiandoContrasena}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {cambiandoContrasena ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Cambiando...
+                    </>
+                  ) : (
+                    'Cambiar'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
     </motion.div>
+    
   );
 }
 
