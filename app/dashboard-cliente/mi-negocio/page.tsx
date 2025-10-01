@@ -35,6 +35,12 @@ export default function MiNegocioPage() {
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
   const [cambiandoContrasena, setCambiandoContrasena] = useState(false);
 
+  // Estados para modal de conflicto de horarios
+  const [modalConflicto, setModalConflicto] = useState<{
+    visible: boolean;
+    citas: any[];
+  }>({ visible: false, citas: [] });
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -211,9 +217,82 @@ export default function MiNegocioPage() {
     });
   };
 
+  const verificarConflictosHorario = async () => {
+    if (!cliente) return { hayConflicto: false, citasAfectadas: [] };
+
+    // Obtener fechas futuras (desde hoy en adelante)
+    const hoy = new Date().toISOString().split('T')[0];
+    
+    // Consultar reservas pendientes del cliente
+    const { data: reservasPendientes, error } = await supabase
+      .from('reservas')
+      .select('id, nombre, apellido, telefono, fecha, hora, id_barbero')
+      .eq('id_cliente', cliente.id_cliente)
+      .eq('estado', 'pendiente')
+      .gte('fecha', hoy);
+
+    if (error) {
+      console.error('Error consultando reservas:', error);
+      return { hayConflicto: false, citasAfectadas: [] };
+    }
+
+    // Obtener la configuración ACTUAL guardada en BD para comparar
+    const diasNoDisponiblesActuales = cliente.dias_no_disponibles || [];
+    const horasNoDisponiblesActuales = cliente.horas_no_disponibles || {};
+
+    // Verificar si alguna reserva cae en horarios que AHORA se van a marcar como no disponibles
+    const citasAfectadas: any[] = [];
+
+    reservasPendientes?.forEach((reserva) => {
+      const diaSemana = obtenerDiaSemana(reserva.fecha);
+      
+      // Verificar si el día NO ESTABA bloqueado antes PERO AHORA SÍ
+      const diaSeBloqueoAhora = diasNoDisponibles.includes(diaSemana) && 
+                                !diasNoDisponiblesActuales.includes(diaSemana);
+      
+      if (diaSeBloqueoAhora) {
+        citasAfectadas.push(reserva);
+        return;
+      }
+
+      // Verificar si la hora NO ESTABA bloqueada antes PERO AHORA SÍ
+      const horaEstabaBloqueada = horasNoDisponiblesActuales[diaSemana]?.includes(reserva.hora);
+      const horaAhoraBloqueada = horasNoDisponibles[diaSemana]?.includes(reserva.hora);
+      
+      if (horaAhoraBloqueada && !horaEstabaBloqueada) {
+        citasAfectadas.push(reserva);
+      }
+    });
+
+    return {
+      hayConflicto: citasAfectadas.length > 0,
+      citasAfectadas
+    };
+  };
+
+  // Función auxiliar para obtener día de la semana
+  const obtenerDiaSemana = (fecha: string): string => {
+    const diasMap = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const date = new Date(fecha + 'T00:00:00');
+    return diasMap[date.getDay()];
+  };
+
   const handleGuardar = async () => {
     if (!cliente) return;
 
+    // PASO 1: Verificar conflictos ANTES de guardar
+    const { hayConflicto, citasAfectadas } = await verificarConflictosHorario();
+    
+    if (hayConflicto) {
+      // Mostrar modal de conflicto y NO continuar
+      setModalConflicto({
+        visible: true,
+        citas: citasAfectadas
+      });
+      return; // IMPORTANTE: Detener la ejecución aquí
+    }
+
+    // PASO 2: Si no hay conflictos, continuar con el guardado normal
     const rangoPorDia: Record<string, { inicio: string; fin: string }> = {};
     diasSemana.forEach((dia) => {
       if (!diasNoDisponibles.includes(dia)) {
@@ -242,7 +321,7 @@ export default function MiNegocioPage() {
       .eq('id_cliente', cliente.id_cliente);
 
     if (res.error) {
-      alert('Error al guardar: ' + res.error.message);
+      toast.error('Error al guardar: ' + res.error.message);
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setMensajeVisible(true);
@@ -799,6 +878,100 @@ export default function MiNegocioPage() {
             </motion.div>
           </div>
         )}
+
+      {/* Modal de conflicto de horarios */}
+        {modalConflicto.visible && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="bg-orange-100 p-2 rounded-full flex-shrink-0">
+                  <Calendar className="text-orange-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    ⚠️ No se puede guardar - Tienes citas programadas
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Los cambios que intentas hacer afectan {modalConflicto.citas.length} cita{modalConflicto.citas.length !== 1 ? 's' : ''} pendiente{modalConflicto.citas.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
+                <p className="text-sm text-gray-800">
+                  <strong>Importante:</strong> Debes gestionar estas citas antes de poder cambiar tu disponibilidad. 
+                  Ve a la página de Reservas para reprogramarlas o marcarlas como incumplidas.
+                </p>
+              </div>
+
+              {/* Lista de citas afectadas */}
+              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+                <h4 className="font-semibold text-gray-800 sticky top-0 bg-white pb-2">
+                  Citas que debes gestionar:
+                </h4>
+                {modalConflicto.citas.map((cita, index) => (
+                  <div 
+                    key={cita.id} 
+                    className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900">
+                          {cita.nombre} {cita.apellido}
+                        </p>
+                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={14} />
+                            {new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long'
+                            })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={14} />
+                            {cita.hora}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          📞 {cita.telefono}
+                        </p>
+                      </div>
+                      <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded">
+                        Pendiente
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Botones del modal */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setModalConflicto({ visible: false, citas: [] })}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={() => {
+                    setModalConflicto({ visible: false, citas: [] });
+                    window.location.href = '/reservas';
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                >
+                  <Calendar size={18} />
+                  Ir a gestionar reservas
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
     </motion.div>
     
   );
