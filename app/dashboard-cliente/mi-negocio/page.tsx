@@ -220,10 +220,19 @@ export default function MiNegocioPage() {
   const verificarConflictosHorario = async () => {
     if (!cliente) return { hayConflicto: false, citasAfectadas: [] };
 
-    // Obtener fechas futuras (desde hoy en adelante)
+    // IMPORTANTE: Obtener datos FRESCOS de la BD antes de comparar
+    const { data: clienteActual } = await supabase
+      .from('clientes')
+      .select('dias_no_disponibles, horas_no_disponibles')
+      .eq('id_cliente', cliente.id_cliente)
+      .single();
+
+    if (!clienteActual) {
+      return { hayConflicto: false, citasAfectadas: [] };
+    }
+
     const hoy = new Date().toISOString().split('T')[0];
     
-    // Consultar reservas pendientes del cliente
     const { data: reservasPendientes, error } = await supabase
       .from('reservas')
       .select('id, nombre, apellido, telefono, fecha, hora, id_barbero')
@@ -236,17 +245,16 @@ export default function MiNegocioPage() {
       return { hayConflicto: false, citasAfectadas: [] };
     }
 
-    // Obtener la configuración ACTUAL guardada en BD para comparar
-    const diasNoDisponiblesActuales = cliente.dias_no_disponibles || [];
-    const horasNoDisponiblesActuales = cliente.horas_no_disponibles || {};
+    // Usar datos FRESCOS de la BD
+    const diasNoDisponiblesActuales = clienteActual.dias_no_disponibles || [];
+    const horasNoDisponiblesActuales = clienteActual.horas_no_disponibles || {};
 
-    // Verificar si alguna reserva cae en horarios que AHORA se van a marcar como no disponibles
     const citasAfectadas: any[] = [];
 
     reservasPendientes?.forEach((reserva) => {
       const diaSemana = obtenerDiaSemana(reserva.fecha);
       
-      // Verificar si el día NO ESTABA bloqueado antes PERO AHORA SÍ
+      // Comparar estado NUEVO (del form) vs ACTUAL (de BD)
       const diaSeBloqueoAhora = diasNoDisponibles.includes(diaSemana) && 
                                 !diasNoDisponiblesActuales.includes(diaSemana);
       
@@ -255,7 +263,6 @@ export default function MiNegocioPage() {
         return;
       }
 
-      // Verificar si la hora NO ESTABA bloqueada antes PERO AHORA SÍ
       const horaEstabaBloqueada = horasNoDisponiblesActuales[diaSemana]?.includes(reserva.hora);
       const horaAhoraBloqueada = horasNoDisponibles[diaSemana]?.includes(reserva.hora);
       
