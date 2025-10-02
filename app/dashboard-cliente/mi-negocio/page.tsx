@@ -24,6 +24,7 @@ export default function MiNegocioPage() {
   const [intervaloInvalido, setIntervaloInvalido] = useState(false);
   const [mensajeVisible, setMensajeVisible] = useState(false);
   const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   // Estados para el modal de cambio de contraseña
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -297,98 +298,112 @@ export default function MiNegocioPage() {
   };
 
   const handleGuardar = async () => {
-    if (!cliente) return;
+    if (!cliente || guardando) return;
 
-    // PASO 1: Verificar conflictos ANTES de guardar
-    const { hayConflicto, citasAfectadas } = await verificarConflictosHorario();
-    
-    if (hayConflicto) {
-      // Mostrar modal y NO continuar
-      setModalConflicto({
-        visible: true,
-        citas: citasAfectadas
-      });
-      
-      // IMPORTANTE: Recargar los datos originales de la BD
-      const { data } = await supabase
+    setGuardando(true);
+
+    try {
+      // Obtener datos actuales de la BD para comparar
+      const { data: datosActuales } = await supabase
         .from('clientes')
-        .select('*')
+        .select('dias_no_disponibles, horas_no_disponibles, rango_horarios, intervalo_citas')
         .eq('id_cliente', cliente.id_cliente)
         .single();
+
+      // Verificar si realmente hay cambios
+      const huboCAmbios = 
+        JSON.stringify(datosActuales.dias_no_disponibles || []) !== JSON.stringify(diasNoDisponibles) ||
+        JSON.stringify(datosActuales.horas_no_disponibles || {}) !== JSON.stringify(horasNoDisponibles) ||
+        datosActuales.intervalo_citas !== intervalo;
+
+      if (!huboCAmbios) {
+        toast.error('No hay cambios para guardar');
+        return;
+      }
+
+      // Verificar conflictos SOLO si hay cambios
+      const { hayConflicto, citasAfectadas } = await verificarConflictosHorario();
       
-      if (data) {
-        // Restaurar el estado original
-        setDiasNoDisponibles(data.dias_no_disponibles || []);
-        setHorasNoDisponibles(data.horas_no_disponibles || {});
+      if (hayConflicto) {
+        setModalConflicto({
+          visible: true,
+          citas: citasAfectadas
+        });
+        
+        // Restaurar estado original
+        setDiasNoDisponibles(datosActuales.dias_no_disponibles || []);
+        setHorasNoDisponibles(datosActuales.horas_no_disponibles || {});
         
         const abiertos: Record<string, boolean> = {};
         for (const dia of diasSemana) {
           abiertos[dia] = false;
         }
         setDiasAbiertos(abiertos);
+        
+        return;
       }
-      
-      return; // Detener ejecución
-    }
 
-    // PASO 2: Si no hay conflictos, continuar con el guardado normal
-    const rangoPorDia: Record<string, { inicio: string; fin: string }> = {};
-    diasSemana.forEach((dia) => {
-      if (!diasNoDisponibles.includes(dia)) {
-        rangoPorDia[dia] = {
-          inicio: rangoInicio,
-          fin: rangoFin,
-        };
-      }
-    });
-
-    const horasFiltradas: Record<string, string[]> = {};
-    Object.entries(horasNoDisponibles).forEach(([dia, horas]) => {
-      if (horas.length > 0) {
-        horasFiltradas[dia] = horas;
-      }
-    });
-
-    const res = await supabase
-      .from('clientes')
-      .update({
-        rango_horarios: rangoPorDia,
-        intervalo_citas: intervalo,
-        dias_no_disponibles: diasNoDisponibles,
-        horas_no_disponibles: horasFiltradas,
-      })
-      .eq('id_cliente', cliente.id_cliente);
-
-    if (res.error) {
-      toast.error('Error al guardar: ' + res.error.message);
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setMensajeVisible(true);
-      setTimeout(() => setMensajeVisible(false), 3000);
-
-      const { data } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('id_cliente', cliente.id_cliente)
-        .maybeSingle();
-
-      if (data) {
-        const diasConHorario = Object.keys(data.rango_horarios || {});
-        const primerDia = diasConHorario[0];
-        const horario = data.rango_horarios?.[primerDia] || { inicio: '10:00', fin: '20:00' };
-
-        setRangoInicio(horario.inicio);
-        setRangoFin(horario.fin);
-        setIntervalo(data.intervalo_citas || 45);
-        setDiasNoDisponibles(data.dias_no_disponibles || []);
-        setHorasNoDisponibles(data.horas_no_disponibles || {});
-
-        const abiertos: Record<string, boolean> = {};
-        for (const dia of diasSemana) {
-          abiertos[dia] = false;
+      // Si llegamos aquí, guardar cambios
+      const rangoPorDia: Record<string, { inicio: string; fin: string }> = {};
+      diasSemana.forEach((dia) => {
+        if (!diasNoDisponibles.includes(dia)) {
+          rangoPorDia[dia] = {
+            inicio: rangoInicio,
+            fin: rangoFin,
+          };
         }
-        setDiasAbiertos(abiertos);
+      });
+
+      const horasFiltradas: Record<string, string[]> = {};
+      Object.entries(horasNoDisponibles).forEach(([dia, horas]) => {
+        if (horas.length > 0) {
+          horasFiltradas[dia] = horas;
+        }
+      });
+
+      const res = await supabase
+        .from('clientes')
+        .update({
+          rango_horarios: rangoPorDia,
+          intervalo_citas: intervalo,
+          dias_no_disponibles: diasNoDisponibles,
+          horas_no_disponibles: horasFiltradas,
+        })
+        .eq('id_cliente', cliente.id_cliente);
+
+      if (res.error) {
+        toast.error('Error al guardar: ' + res.error.message);
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setMensajeVisible(true);
+        setTimeout(() => setMensajeVisible(false), 3000);
+
+        const { data } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('id_cliente', cliente.id_cliente)
+          .maybeSingle();
+
+        if (data) {
+          const diasConHorario = Object.keys(data.rango_horarios || {});
+          const primerDia = diasConHorario[0];
+          const horario = data.rango_horarios?.[primerDia] || { inicio: '10:00', fin: '20:00' };
+
+          setRangoInicio(horario.inicio);
+          setRangoFin(horario.fin);
+          setIntervalo(data.intervalo_citas || 45);
+          setDiasNoDisponibles(data.dias_no_disponibles || []);
+          setHorasNoDisponibles(data.horas_no_disponibles || {});
+
+          const abiertos: Record<string, boolean> = {};
+          for (const dia of diasSemana) {
+            abiertos[dia] = false;
+          }
+          setDiasAbiertos(abiertos);
+        }
       }
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -793,9 +808,10 @@ export default function MiNegocioPage() {
 
           <button
             onClick={handleGuardar}
-            className="w-full py-3 rounded-lg font-semibold transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={guardando}
+            className="w-full py-3 rounded-lg font-semibold transition-colors bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Guardar cambios
+            {guardando ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </>
       )}
