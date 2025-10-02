@@ -234,7 +234,7 @@ export default function MiNegocioPage() {
     
     const { data: reservasPendientes, error } = await supabase
       .from('reservas')
-      .select('id, nombre, telefono, fecha, hora, id_barbero')
+      .select('id, nombre, correo, identificacion, fecha, hora, id_barbero')  // ← CORRECTO
       .eq('id_cliente', cliente.id_cliente)
       .eq('estado', 'pendiente')
       .gte('fecha', hoy);
