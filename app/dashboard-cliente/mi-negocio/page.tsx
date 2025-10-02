@@ -303,12 +303,32 @@ export default function MiNegocioPage() {
     const { hayConflicto, citasAfectadas } = await verificarConflictosHorario();
     
     if (hayConflicto) {
-      // Mostrar modal de conflicto y NO continuar
+      // Mostrar modal y NO continuar
       setModalConflicto({
         visible: true,
         citas: citasAfectadas
       });
-      return; // IMPORTANTE: Detener la ejecución aquí
+      
+      // IMPORTANTE: Recargar los datos originales de la BD
+      const { data } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('id_cliente', cliente.id_cliente)
+        .single();
+      
+      if (data) {
+        // Restaurar el estado original
+        setDiasNoDisponibles(data.dias_no_disponibles || []);
+        setHorasNoDisponibles(data.horas_no_disponibles || {});
+        
+        const abiertos: Record<string, boolean> = {};
+        for (const dia of diasSemana) {
+          abiertos[dia] = false;
+        }
+        setDiasAbiertos(abiertos);
+      }
+      
+      return; // Detener ejecución
     }
 
     // PASO 2: Si no hay conflictos, continuar con el guardado normal
