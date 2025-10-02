@@ -220,16 +220,15 @@ export default function MiNegocioPage() {
   const verificarConflictosHorario = async () => {
     if (!cliente) return { hayConflicto: false, citasAfectadas: [] };
 
-    // IMPORTANTE: Obtener datos FRESCOS de la BD antes de comparar
     const { data: clienteActual } = await supabase
       .from('clientes')
       .select('dias_no_disponibles, horas_no_disponibles')
       .eq('id_cliente', cliente.id_cliente)
       .single();
 
-    if (!clienteActual) {
-      return { hayConflicto: false, citasAfectadas: [] };
-    }
+    console.log('🔍 Datos actuales en BD:', clienteActual);
+    console.log('🔍 Días NO disponibles (nuevo):', diasNoDisponibles);
+    console.log('🔍 Horas NO disponibles (nuevo):', horasNoDisponibles);
 
     const hoy = new Date().toISOString().split('T')[0];
     
@@ -240,12 +239,13 @@ export default function MiNegocioPage() {
       .eq('estado', 'pendiente')
       .gte('fecha', hoy);
 
+    console.log('📅 Reservas pendientes encontradas:', reservasPendientes);
+
     if (error) {
       console.error('Error consultando reservas:', error);
       return { hayConflicto: false, citasAfectadas: [] };
     }
 
-    // Usar datos FRESCOS de la BD
     const diasNoDisponiblesActuales = clienteActual.dias_no_disponibles || [];
     const horasNoDisponiblesActuales = clienteActual.horas_no_disponibles || {};
 
@@ -254,9 +254,14 @@ export default function MiNegocioPage() {
     reservasPendientes?.forEach((reserva) => {
       const diaSemana = obtenerDiaSemana(reserva.fecha);
       
-      // Comparar estado NUEVO (del form) vs ACTUAL (de BD)
+      console.log(`🔄 Procesando reserva: ${reserva.nombre} - Fecha: ${reserva.fecha} - Día: ${diaSemana}`);
+      console.log(`   ¿Día estaba bloqueado? ${diasNoDisponiblesActuales.includes(diaSemana)}`);
+      console.log(`   ¿Día se bloquea ahora? ${diasNoDisponibles.includes(diaSemana)}`);
+      
       const diaSeBloqueoAhora = diasNoDisponibles.includes(diaSemana) && 
                                 !diasNoDisponiblesActuales.includes(diaSemana);
+      
+      console.log(`   ✅ ¿Es conflicto de día? ${diaSeBloqueoAhora}`);
       
       if (diaSeBloqueoAhora) {
         citasAfectadas.push(reserva);
@@ -266,10 +271,17 @@ export default function MiNegocioPage() {
       const horaEstabaBloqueada = horasNoDisponiblesActuales[diaSemana]?.includes(reserva.hora);
       const horaAhoraBloqueada = horasNoDisponibles[diaSemana]?.includes(reserva.hora);
       
+      console.log(`   Hora: ${reserva.hora}`);
+      console.log(`   ¿Hora estaba bloqueada? ${horaEstabaBloqueada}`);
+      console.log(`   ¿Hora se bloquea ahora? ${horaAhoraBloqueada}`);
+      console.log(`   ✅ ¿Es conflicto de hora? ${horaAhoraBloqueada && !horaEstabaBloqueada}`);
+      
       if (horaAhoraBloqueada && !horaEstabaBloqueada) {
         citasAfectadas.push(reserva);
       }
     });
+
+    console.log('🎯 TOTAL citas afectadas:', citasAfectadas);
 
     return {
       hayConflicto: citasAfectadas.length > 0,
