@@ -976,31 +976,37 @@ export default function MiNegocioPage() {
                 {/* Días del mes */}
                 <div className="grid grid-cols-7">
                   {generarDiasDelMes().map((fecha, index) => {
-                    if (!fecha) {
-                      return <div key={`empty-${index}`} className="p-2 border-b border-r"></div>;
-                    }
+                      if (!fecha) {
+                        return <div key={`empty-${index}`} className="p-2 border-b border-r"></div>;
+                      }
 
-                    const fechaStr = formatearFecha(fecha);
-                    const estaBloqueado = diasBloqueadosEspecificos.includes(fechaStr);
-                    const esPasado = esDiaPasado(fecha);
+                      const fechaStr = formatearFecha(fecha);
+                      const estaBloqueado = diasBloqueadosEspecificos.includes(fechaStr);
+                      const esPasado = esDiaPasado(fecha);
+                      
+                      // NUEVO: Verificar si el día de la semana está bloqueado
+                      const diasSemanaMap = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+                      const diaSemana = diasSemanaMap[fecha.getDay()];
+                      const diaSemanaBloqueado = diasNoDisponibles.includes(diaSemana);
 
-                    return (
-                      <button
-                        key={fechaStr}
-                        onClick={() => !esPasado && toggleDiaBloqueado(fechaStr)}
-                        disabled={esPasado}
-                        className={`p-2 border-b border-r text-sm min-h-[3rem] transition-colors ${
-                          esPasado
-                            ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                            : estaBloqueado
-                            ? 'bg-red-500 text-white hover:bg-red-600 font-semibold'
-                            : 'hover:bg-blue-50 text-gray-700'
-                        }`}
-                      >
-                        {fecha.getDate()}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={fechaStr}
+                          onClick={() => !esPasado && !diaSemanaBloqueado && toggleDiaBloqueado(fechaStr)}
+                          disabled={esPasado || diaSemanaBloqueado}
+                          className={`p-2 border-b border-r text-sm min-h-[3rem] transition-colors ${
+                            esPasado
+                              ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                              : estaBloqueado || diaSemanaBloqueado
+                              ? 'bg-red-500 text-white hover:bg-red-600 font-semibold cursor-not-allowed'
+                              : 'hover:bg-blue-50 text-gray-700'
+                          }`}
+                          title={diaSemanaBloqueado ? `${diaSemana} está bloqueado por día de la semana` : ''}
+                        >
+                          {fecha.getDate()}
+                        </button>
+                      );
+                    })}
                 </div>
 
                 {/* Leyenda */}
