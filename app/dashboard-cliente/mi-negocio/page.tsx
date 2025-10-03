@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Lock, Eye, EyeOff, Calendar, Settings, Store, Link2, Copy, Globe, TrendingUp, CreditCard, Upload } from 'lucide-react';
 import toast from "react-hot-toast";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const diasSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
@@ -25,6 +26,11 @@ export default function MiNegocioPage() {
   const [mensajeVisible, setMensajeVisible] = useState(false);
   const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  // Estados para el calendario de días bloqueados
+  const [mesActual, setMesActual] = useState(new Date());
+  const [diasBloqueadosEspecificos, setDiasBloqueadosEspecificos] = useState<string[]>([]);
+  const [cargandoDiasBloqueados, setCargandoDiasBloqueados] = useState(false);
 
   // Estados para el modal de cambio de contraseña
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -87,6 +93,12 @@ export default function MiNegocioPage() {
 
     obtenerDatos();
   }, []);
+
+  useEffect(() => {
+    if (cliente) {
+      cargarDiasBloqueados();
+    }
+  }, [cliente]);
 
   const subirLogo = async (event) => {
     const file = event.target.files?.[0];
@@ -289,6 +301,113 @@ export default function MiNegocioPage() {
       citasAfectadas
     };
   };
+
+  const cargarDiasBloqueados = async () => {
+    if (!cliente) return;
+    
+    setCargandoDiasBloqueados(true);
+    try {
+      const { data, error } = await supabase
+        .from('dias_bloqueados')
+        .select('fecha')
+        .eq('id_cliente', cliente.id_cliente);
+
+      if (error) throw error;
+
+      const fechas = data?.map(d => d.fecha) || [];
+      setDiasBloqueadosEspecificos(fechas);
+    } catch (error) {
+      console.error('Error cargando días bloqueados:', error);
+    } finally {
+      setCargandoDiasBloqueados(false);
+    }
+  };
+
+  const toggleDiaBloqueado = async (fecha: string) => {
+      if (!cliente) return;
+
+      const yaEstaBloqueado = diasBloqueadosEspecificos.includes(fecha);
+
+      try {
+        if (yaEstaBloqueado) {
+          // Desbloquear
+          const { error } = await supabase
+            .from('dias_bloqueados')
+            .delete()
+            .eq('id_cliente', cliente.id_cliente)
+            .eq('fecha', fecha);
+
+          if (error) throw error;
+
+          setDiasBloqueadosEspecificos(prev => prev.filter(f => f !== fecha));
+          toast.success('✅ Día desbloqueado');
+        } else {
+          // Bloquear
+          const { error } = await supabase
+            .from('dias_bloqueados')
+            .insert({
+              id_cliente: cliente.id_cliente,
+              fecha: fecha,
+            });
+
+          if (error) throw error;
+
+          setDiasBloqueadosEspecificos(prev => [...prev, fecha]);
+          toast.success('✅ Día bloqueado');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error('Error al actualizar el día');
+      }
+    };
+
+    const generarDiasDelMes = () => {
+      const año = mesActual.getFullYear();
+      const mes = mesActual.getMonth();
+      
+      const primerDia = new Date(año, mes, 1);
+      const ultimoDia = new Date(año, mes + 1, 0);
+      
+      const dias: Array<Date | null> = [];
+      
+      // Agregar días vacíos al inicio
+      const diaSemanaInicio = primerDia.getDay();
+      const diasVaciosInicio = diaSemanaInicio === 0 ? 6 : diaSemanaInicio - 1;
+      
+      for (let i = 0; i < diasVaciosInicio; i++) {
+        dias.push(null);
+      }
+      
+      // Agregar todos los días del mes
+      for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+        dias.push(new Date(año, mes, dia));
+      }
+      
+      return dias;
+    };
+
+    const cambiarMes = (direccion: number) => {
+      setMesActual(prev => {
+        const nuevo = new Date(prev);
+        nuevo.setMonth(nuevo.getMonth() + direccion);
+        return nuevo;
+      });
+    };
+
+    const formatearFecha = (fecha: Date): string => {
+      const año = fecha.getFullYear();
+      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+      const dia = String(fecha.getDate()).padStart(2, '0');
+      return `${año}-${mes}-${dia}`;
+    };
+
+    const esDiaPasado = (fecha: Date): boolean => {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const fechaComparar = new Date(fecha);
+      fechaComparar.setHours(0, 0, 0, 0);
+      return fechaComparar < hoy;
+    };
 
   // Función auxiliar para obtener día de la semana
   const obtenerDiaSemana = (fecha: string): string => {
@@ -805,6 +924,104 @@ export default function MiNegocioPage() {
                 ))}
             </div>
           </div>
+
+          {/* Calendario de días bloqueados específicos */}
+          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Calendar size={20} />
+              Bloquear Días Específicos
+            </h2>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Selecciona días específicos del calendario para bloquearlos. Esto es independiente del bloqueo por día de la semana.
+            </p>
+
+            {cargandoDiasBloqueados ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-600">Cargando calendario...</p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                {/* Header del calendario */}
+                <div className="bg-gray-50 p-3 flex items-center justify-between border-b">
+                  <button
+                    onClick={() => cambiarMes(-1)}
+                    className="p-2 hover:bg-gray-200 rounded-lg transition"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  
+                  <h3 className="font-semibold text-gray-800">
+                    {mesActual.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}
+                  </h3>
+                  
+                  <button
+                    onClick={() => cambiarMes(1)}
+                    className="p-2 hover:bg-gray-200 rounded-lg transition"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+
+                {/* Días de la semana */}
+                <div className="grid grid-cols-7 bg-gray-100 border-b">
+                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((dia, i) => (
+                    <div key={i} className="p-2 text-center text-sm font-semibold text-gray-600">
+                      {dia}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Días del mes */}
+                <div className="grid grid-cols-7">
+                  {generarDiasDelMes().map((fecha, index) => {
+                    if (!fecha) {
+                      return <div key={`empty-${index}`} className="p-2 border-b border-r"></div>;
+                    }
+
+                    const fechaStr = formatearFecha(fecha);
+                    const estaBloqueado = diasBloqueadosEspecificos.includes(fechaStr);
+                    const esPasado = esDiaPasado(fecha);
+
+                    return (
+                      <button
+                        key={fechaStr}
+                        onClick={() => !esPasado && toggleDiaBloqueado(fechaStr)}
+                        disabled={esPasado}
+                        className={`p-2 border-b border-r text-sm min-h-[3rem] transition-colors ${
+                          esPasado
+                            ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                            : estaBloqueado
+                            ? 'bg-red-500 text-white hover:bg-red-600 font-semibold'
+                            : 'hover:bg-blue-50 text-gray-700'
+                        }`}
+                      >
+                        {fecha.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Leyenda */}
+                <div className="bg-gray-50 p-3 border-t flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-500 rounded"></div>
+                    <span>Bloqueado</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-white border rounded"></div>
+                    <span>Disponible</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
+                    <span>Día pasado</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
 
           <button
             onClick={handleGuardar}

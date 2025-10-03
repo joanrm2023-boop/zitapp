@@ -20,7 +20,7 @@ function ReservarSlugContent() {
   const [horas, setHoras] = useState<string[]>([]);
   const [horasOcupadas, setHorasOcupadas] = useState<string[]>([]);
   const [cargando, setCargando] = useState(true);
-
+  const [diasBloqueados, setDiasBloqueados] = useState<string[]>([]);
   const [nombre, setNombre] = useState('');
   const [errorNombre, setErrorNombre] = useState('');
 
@@ -140,24 +140,31 @@ function ReservarSlugContent() {
     })();
   }, [slug]);
 
-  // Cargar barberos activos del cliente
+  // Cargar días bloqueados específicos
   useEffect(() => {
     if (!cliente?.id_cliente) return;
     (async () => {
       try {
-        const { data } = await supabase
-          .from('barberos')
-          .select('*')
-          .eq('id_cliente', cliente.id_cliente)
-          .eq('activo', true)
-          .neq('estado', 'eliminado');
-        setBarberos(data || []);
+        const { data, error } = await supabase
+          .from('dias_bloqueados')
+          .select('fecha')
+          .eq('id_cliente', cliente.id_cliente);
+        
+        if (error) {
+          console.error('Error cargando días bloqueados:', error);
+          setDiasBloqueados([]);
+        } else {
+          const fechasBloqueadas = data?.map(d => d.fecha) || [];
+          setDiasBloqueados(fechasBloqueadas);
+        }
       } catch (err) {
-        console.error('Error cargando barberos:', err);
-        setBarberos([]);
+        console.error('Error consultando días bloqueados:', err);
+        setDiasBloqueados([]);
       }
     })();
   }, [cliente]);
+
+
 
   // Cargar horas disponibles según rango y día
   useEffect(() => {
@@ -416,30 +423,36 @@ function ReservarSlugContent() {
   };
 
   // Validación de fecha
-  useEffect(() => {
-    if (fecha && hoy) {
-      const hoyDate = new Date(hoy + 'T00:00:00');
-      const fechaSeleccionada = new Date(fecha + 'T00:00:00');
-      
-      // VALIDACIÓN 1: Fecha pasada
-      if (fechaSeleccionada < hoyDate) {
-        setErrorFecha('❌ No puedes agendar citas en fechas pasadas.');
-        return;
+    useEffect(() => {
+      if (fecha && hoy) {
+        const hoyDate = new Date(hoy + 'T00:00:00');
+        const fechaSeleccionada = new Date(fecha + 'T00:00:00');
+        
+        // VALIDACIÓN 1: Fecha pasada
+        if (fechaSeleccionada < hoyDate) {
+          setErrorFecha('❌ No puedes agendar citas en fechas pasadas.');
+          return;
+        }
+        
+        // VALIDACIÓN 2: Día bloqueado específico
+        if (diasBloqueados.includes(fecha)) {
+          setErrorFecha('❌ Este día no está disponible para reservas.');
+          return;
+        }
+        
+        // VALIDACIÓN 3: Límite de días hacia adelante
+        const maxDiasAnticipacion = 30;
+        const fechaMaxima = new Date(hoyDate.getTime() + maxDiasAnticipacion * 24 * 60 * 60 * 1000);
+        
+        if (fechaSeleccionada > fechaMaxima) {
+          setErrorFecha(`❌ No puedes reservar con más de ${maxDiasAnticipacion} días de anticipación.`);
+          return;
+        }
+        
+        // Si llegamos aquí, la fecha es válida
+        setErrorFecha('');
       }
-      
-      // VALIDACIÓN 2: Límite de días hacia adelante
-      const maxDiasAnticipacion = 30;
-      const fechaMaxima = new Date(hoyDate.getTime() + maxDiasAnticipacion * 24 * 60 * 60 * 1000);
-      
-      if (fechaSeleccionada > fechaMaxima) {
-        setErrorFecha(`❌ No puedes reservar con más de ${maxDiasAnticipacion} días de anticipación.`);
-        return;
-      }
-      
-      // Si llegamos aquí, la fecha es válida
-      setErrorFecha('');
-    }
-  }, [fecha, hoy]);
+    }, [fecha, hoy, diasBloqueados]);
 
   
   // MODIFICADO: handleSubmit con envío de email
