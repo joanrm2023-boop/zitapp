@@ -140,6 +140,26 @@ function ReservarSlugContent() {
     })();
   }, [slug]);
 
+
+  // Cargar profesionales
+  useEffect(() => {
+      if (!cliente?.id_cliente) return;
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('barberos')
+            .select('*')
+            .eq('id_cliente', cliente.id_cliente)
+            .eq('activo', true)
+            .neq('estado', 'eliminado');
+          setBarberos(data || []);
+        } catch (err) {
+          console.error('Error cargando barberos:', err);
+          setBarberos([]);
+        }
+      })();
+    }, [cliente]);
+
   // Cargar días bloqueados específicos
   useEffect(() => {
     if (!cliente?.id_cliente) return;
@@ -455,7 +475,7 @@ function ReservarSlugContent() {
     }, [fecha, hoy, diasBloqueados]);
 
   
-  // MODIFICADO: handleSubmit con envío de email
+  // MODIFICADO: handleSubmit con envío de emailcd do
   const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       marcarInteraccion();
