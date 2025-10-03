@@ -187,11 +187,17 @@ function ReservarSlugContent() {
 
 
   // Cargar horas disponibles según rango y día
-  useEffect(() => {
-    if (!cliente || !cliente.rango_horarios || !cliente.intervalo_citas || !fecha) {
-      setHoras([]);
-      return;
-    }
+    useEffect(() => {
+      if (!cliente || !cliente.rango_horarios || !cliente.intervalo_citas || !fecha) {
+        setHoras([]);
+        return;
+      }
+
+      // Si el día está bloqueado específicamente, no mostrar horas
+      if (diasBloqueados.includes(fecha)) {
+        setHoras([]);
+        return;
+      }
 
     try {
       const fechaSeleccionada = new Date(fecha + 'T00:00:00');
@@ -741,9 +747,9 @@ function ReservarSlugContent() {
             type="email"
             value={correo}
             onChange={handleCorreoChange}
-            onBlur={handleCorreoBlur}  // 🔹 aquí se invoca tu validación
+            onBlur={handleCorreoBlur}
             placeholder="Ingresa tu correo electrónico"
-            className="border p-2 rounded w-full"
+            className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
 
           {/* Mensaje de error */}
