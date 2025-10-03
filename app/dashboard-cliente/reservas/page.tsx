@@ -132,7 +132,7 @@ export default function ReservasPage() {
     setMostrandoConfirmacion({
       idReserva,
       nuevoEstado,
-      nombreCliente: `${reserva.nombre} ${reserva.apellido}`,
+      nombreCliente: reserva.nombre,
       hora: reserva.hora
     });
     
@@ -485,14 +485,18 @@ export default function ReservasPage() {
                                 <div className="flex justify-between items-start mb-3">
                                   <div className="flex-1">
                                     <h3 className="font-semibold text-gray-800 text-base">
-                                      {reserva.nombre} {reserva.apellido}
+                                      {reserva.nombre}
                                     </h3>
                                     <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                                       <span className="flex items-center gap-1">
                                         <Clock size={14} />
                                         {reserva.hora}
                                       </span>
-                                      <span>{reserva.telefono}</span>
+                                      {reserva.telefono && (
+                                        <span className="flex items-center gap-1">
+                                          📱 {reserva.telefono}
+                                        </span>
+                                      )}
                                     </div>
                                     {reserva.nota && (
                                       <p className="text-gray-600 text-sm mt-2 bg-blue-50 p-2 rounded border-l-4 border-blue-400">

@@ -27,12 +27,16 @@ function ReservarSlugContent() {
   const [correo, setCorreo] = useState('');
   const [errorCorreo, setErrorCorreo] = useState('');
 
+  
   const [identificacion, setIdentificacion] = useState('');
   const [errorIdentificacion, setErrorIdentificacion] = useState('');
   // NUEVO: Estado para error de identificación duplicada
   const [errorIdentificacionDuplicada, setErrorIdentificacionDuplicada] = useState('');
 
   const [errorCorreoDuplicado, setErrorCorreoDuplicado] = useState('');
+
+  const [telefono, setTelefono] = useState('');
+  const [errorTelefono, setErrorTelefono] = useState('');
 
   const [nota, setNota] = useState('');
   const [fecha, setFecha] = useState<string>('');
@@ -44,8 +48,6 @@ function ReservarSlugContent() {
 
   const [mensaje, setMensaje] = useState('');
   const [esError, setEsError] = useState(false);
-
-  const [errorNota, setErrorNota] = useState('');
 
   const mensajeRef = useRef(null);
 
@@ -372,25 +374,26 @@ function ReservarSlugContent() {
     }
   };
 
-  const handleNotaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    marcarInteraccion(); // Marcar que el usuario interactuó
-    const value = e.target.value;
-    setNota(value);
+  const handleTelefonoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    marcarInteraccion();
+    const valor = e.target.value;
     
-    if (value.trim()) {
-      // Buscar números en la nota (formato flexible)
-      const numerosSolo = value.replace(/\D/g, ''); // Quitar todo excepto números
+    // Solo permitir números
+    if (/^\d*$/.test(valor)) {
+      setTelefono(valor);
       
-      if (numerosSolo.length < 10) {
-        setErrorNota('⚠️ Por favor incluye un teléfono de al menos 10 dígitos');
-      } else if (numerosSolo.length > 15) {
-        setErrorNota('⚠️ El teléfono parece demasiado largo');
+      // Validar longitud
+      if (valor.length > 0 && (valor.length < 10 || valor.length > 15)) {
+        setErrorTelefono('❌ El teléfono debe tener entre 10 y 15 dígitos');
       } else {
-        setErrorNota('');
+        setErrorTelefono('');
       }
-    } else {
-      setErrorNota('');
     }
+  };
+
+  const handleNotaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    marcarInteraccion();
+    setNota(e.target.value);
   };
 
   const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -453,6 +456,7 @@ function ReservarSlugContent() {
       if (!nombre.trim()) camposVacios.push('Nombre');
       if (!correo.trim()) camposVacios.push('Correo');
       if (!identificacion.trim()) camposVacios.push('Identificación');
+      if (!telefono.trim()) camposVacios.push('Teléfono'); // AGREGADO
       if (!fecha) camposVacios.push('Fecha');
       if (!horaSeleccionada) camposVacios.push('Hora');
       if (!barberoSeleccionado) camposVacios.push('Profesional');
@@ -464,7 +468,7 @@ function ReservarSlugContent() {
       }
 
       // Verificar errores de validación (INCLUYENDO el nuevo error de duplicado)
-      if (errorNombre || errorCorreo || errorIdentificacion || errorFecha || errorIdentificacionDuplicada) {
+      if (errorNombre || errorCorreo || errorIdentificacion || errorTelefono || errorFecha || errorIdentificacionDuplicada) {
         if (errorIdentificacionDuplicada) {
           setMensaje(errorIdentificacionDuplicada);
         } else {
@@ -519,6 +523,7 @@ function ReservarSlugContent() {
             nombre,
             correo,
             identificacion,
+            telefono, 
             fecha,
             hora: horaSeleccionada,
             nota,
@@ -600,6 +605,7 @@ function ReservarSlugContent() {
           setNombre('');
           setCorreo('');
           setIdentificacion('');
+          setTelefono('');
           setHoraSeleccionada('');
           setBarberoSeleccionado('');
           setNota('');
@@ -620,18 +626,7 @@ function ReservarSlugContent() {
     if (!nombre.trim()) faltantes.push('Nombre');
     if (!correo.trim()) faltantes.push('Correo');
     if (!identificacion.trim()) faltantes.push('Identificación');
-    
-    // VALIDACIÓN MEJORADA DE NOTA: verificar si tiene teléfono válido
-    if (nota.trim()) {
-      const numerosSolo = nota.replace(/\D/g, '');
-      if (numerosSolo.length < 10 || numerosSolo.length > 15) {
-        faltantes.push('Teléfono válido en la nota');
-      }
-    } else {
-      // Si no hay nota, considerarla como faltante (ya que requiere teléfono)
-      faltantes.push('Teléfono en la nota');
-    }
-    
+    if (!telefono.trim()) faltantes.push('Teléfono'); // AGREGADO
     if (!fecha) faltantes.push('Fecha');
     if (!horaSeleccionada) faltantes.push('Hora');
     if (!barberoSeleccionado) faltantes.push('Profesional');
@@ -640,7 +635,7 @@ function ReservarSlugContent() {
   };
 
   const camposFaltantes = obtenerCamposFaltantes();
-  const hayErrores = !!(errorNombre || errorCorreo || errorIdentificacion || errorFecha || errorNota || errorIdentificacionDuplicada);
+  const hayErrores = !!(errorNombre || errorCorreo || errorIdentificacion || errorTelefono || errorFecha || errorIdentificacionDuplicada);
   const formularioIncompleto = camposFaltantes.length > 0 || hayErrores;
 
   if (cargando) {
@@ -734,15 +729,25 @@ function ReservarSlugContent() {
           {errorIdentificacion && <p className="text-red-500 text-sm mt-1">{errorIdentificacion}</p>}
           {errorIdentificacionDuplicada && <p className="text-red-500 text-sm mt-1 font-medium">{errorIdentificacionDuplicada}</p>}
 
-          <textarea
-            placeholder="Nota (opcional, por favor ingresar teléfono)"
-            value={nota}
-            onChange={handleNotaChange}
-            rows={3}
-            className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-          />
-          {errorNota && <p className="text-red-500 text-sm mt-1">{errorNota}</p>}
+          {/* NUEVO CAMPO DE TELÉFONO */}
+            <input
+              type="tel"
+              placeholder="Teléfono (10-15 dígitos)"
+              value={telefono}
+              onChange={handleTelefonoChange}
+              className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            {errorTelefono && <p className="text-red-500 text-sm mt-1">{errorTelefono}</p>}
 
+            <textarea
+              placeholder="Nota adicional (opcional)"
+              value={nota}
+              onChange={handleNotaChange}
+              rows={3}
+              className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            />
+
+          
           <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Fecha de tu cita

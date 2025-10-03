@@ -235,7 +235,7 @@ export default function MiNegocioPage() {
     
     const { data: reservasPendientes, error } = await supabase
       .from('reservas')
-      .select('id, nombre, correo, identificacion, fecha, hora, id_barbero')  // ← CORRECTO
+      .select('id, nombre, correo, identificacion, telefono, fecha, hora, id_barbero')
       .eq('id_cliente', cliente.id_cliente)
       .eq('estado', 'pendiente')
       .gte('fecha', hoy);
@@ -976,7 +976,7 @@ export default function MiNegocioPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <p className="font-semibold text-gray-900">
-                          {cita.nombre} {cita.apellido}
+                          {cita.nombre}
                         </p>
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
                           <span className="flex items-center gap-1">
@@ -1015,7 +1015,7 @@ export default function MiNegocioPage() {
                 <button
                   onClick={() => {
                     setModalConflicto({ visible: false, citas: [] });
-                    window.location.href = '/reservas';
+                    window.location.href = '/dashboard-cliente/reservas';  //
                   }}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
                 >
