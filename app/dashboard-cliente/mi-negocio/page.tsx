@@ -324,42 +324,70 @@ export default function MiNegocioPage() {
   };
 
   const toggleDiaBloqueado = async (fecha: string) => {
-      if (!cliente) return;
+    if (!cliente) return;
 
-      const yaEstaBloqueado = diasBloqueadosEspecificos.includes(fecha);
+    const yaEstaBloqueado = diasBloqueadosEspecificos.includes(fecha);
 
-      try {
-        if (yaEstaBloqueado) {
-          // Desbloquear
-          const { error } = await supabase
-            .from('dias_bloqueados')
-            .delete()
-            .eq('id_cliente', cliente.id_cliente)
-            .eq('fecha', fecha);
+    try {
+      if (yaEstaBloqueado) {
+        // Desbloquear
+        const { error } = await supabase
+          .from('dias_bloqueados')
+          .delete()
+          .eq('id_cliente', cliente.id_cliente)
+          .eq('fecha', fecha);
 
-          if (error) throw error;
+        if (error) throw error;
 
-          setDiasBloqueadosEspecificos(prev => prev.filter(f => f !== fecha));
-          toast.success('✅ Día desbloqueado');
-        } else {
-          // Bloquear
-          const { error } = await supabase
-            .from('dias_bloqueados')
-            .insert({
-              id_cliente: cliente.id_cliente,
-              fecha: fecha,
-            });
+        setDiasBloqueadosEspecificos(prev => prev.filter(f => f !== fecha));
+        toast.success('✅ Día desbloqueado');
+      } else {
+        // NUEVO: Antes de bloquear, verificar si hay citas pendientes ese día
+        const { data: citasEnFecha, error: errorCitas } = await supabase
+          .from('reservas')
+          .select('id, nombre, correo, telefono, hora')
+          .eq('id_cliente', cliente.id_cliente)
+          .eq('fecha', fecha)
+          .eq('estado', 'pendiente');
 
-          if (error) throw error;
-
-          setDiasBloqueadosEspecificos(prev => [...prev, fecha]);
-          toast.success('✅ Día bloqueado');
+        if (errorCitas) {
+          console.error('Error consultando citas:', errorCitas);
+          toast.error('Error al verificar citas existentes');
+          return;
         }
-      } catch (error) {
-        console.error('Error:', error);
-        toast.error('Error al actualizar el día');
+
+        // Si hay citas, mostrar modal de conflicto
+        if (citasEnFecha && citasEnFecha.length > 0) {
+          setModalConflicto({
+            visible: true,
+            citas: citasEnFecha.map(cita => ({
+              ...cita,
+              fecha: fecha,
+              id_barbero: null
+            }))
+          });
+          toast.error(`❌ No puedes bloquear este día. Hay ${citasEnFecha.length} cita${citasEnFecha.length > 1 ? 's' : ''} pendiente${citasEnFecha.length > 1 ? 's' : ''}`);
+          return;
+        }
+
+        // Si no hay citas, proceder a bloquear
+        const { error } = await supabase
+          .from('dias_bloqueados')
+          .insert({
+            id_cliente: cliente.id_cliente,
+            fecha: fecha,
+          });
+
+        if (error) throw error;
+
+        setDiasBloqueadosEspecificos(prev => [...prev, fecha]);
+        toast.success('✅ Día bloqueado');
       }
-    };
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al actualizar el día');
+    }
+  };
 
     const generarDiasDelMes = () => {
       const año = mesActual.getFullYear();
