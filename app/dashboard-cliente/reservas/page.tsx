@@ -957,7 +957,7 @@ export default function ReservasPage() {
                 <strong>Cliente:</strong> {mostrandoReprogramacion.reserva.nombre}
               </p>
               <p className="text-sm text-gray-700">
-                <strong>Fecha actual:</strong> {new Date(mostrandoReprogramacion.reserva.fecha).toLocaleDateString('es-CO', { 
+                <strong>Fecha actual:</strong> {new Date(mostrandoReprogramacion.reserva.fecha + 'T00:00:00').toLocaleDateString('es-CO', { 
                   weekday: 'long', 
                   day: 'numeric', 
                   month: 'long' 
@@ -969,26 +969,26 @@ export default function ReservasPage() {
             </div>
 
             {/* Vista previa del cambio */}
-            {nuevaHoraReserva && (
-              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
-                <p className="text-sm font-semibold text-blue-900">
-                  📅 Vista previa del cambio:
-                </p>
-                <p className="text-sm text-blue-800 mt-1">
-                  <strong>De:</strong> {new Date(mostrandoReprogramacion.reserva.fecha).toLocaleDateString('es-CO', { 
-                    weekday: 'short', 
-                    day: 'numeric', 
-                    month: 'short' 
-                  })} {mostrandoReprogramacion.reserva.hora}
-                  {' → '}
-                  <strong>A:</strong> {nuevaFechaReserva.toLocaleDateString('es-CO', { 
-                    weekday: 'short', 
-                    day: 'numeric', 
-                    month: 'short' 
-                  })} {nuevaHoraReserva}
-                </p>
-              </div>
-            )}
+              {nuevaHoraReserva && (
+                <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                  <p className="text-sm font-semibold text-blue-900">
+                    📅 Vista previa del cambio:
+                  </p>
+                  <p className="text-sm text-blue-800 mt-1">
+                    <strong>De:</strong> {new Date(mostrandoReprogramacion.reserva.fecha + 'T00:00:00').toLocaleDateString('es-CO', { 
+                      weekday: 'short', 
+                      day: 'numeric', 
+                      month: 'short' 
+                    })} {mostrandoReprogramacion.reserva.hora}
+                    {' → '}
+                    <strong>A:</strong> {nuevaFechaReserva.toLocaleDateString('es-CO', { 
+                      weekday: 'short', 
+                      day: 'numeric', 
+                      month: 'short' 
+                    })} {nuevaHoraReserva}
+                  </p>
+                </div>
+              )}
 
             {/* Selector de fecha */}
             <div className="mb-4">
