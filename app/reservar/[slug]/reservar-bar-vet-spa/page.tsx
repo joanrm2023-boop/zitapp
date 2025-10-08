@@ -416,8 +416,8 @@ function ReservarSlugContent() {
       setTelefono(valor);
       
       // Validar longitud
-      if (valor.length > 0 && (valor.length < 10 || valor.length > 15)) {
-        setErrorTelefono('❌ El teléfono debe tener entre 10 y 15 dígitos');
+      if (valor.length > 0 && valor.length !== 10) {
+        setErrorTelefono('❌ El teléfono debe tener 10 dígitos');
       } else {
         setErrorTelefono('');
       }
@@ -771,7 +771,7 @@ function ReservarSlugContent() {
           {/* NUEVO CAMPO DE TELÉFONO */}
             <input
               type="tel"
-              placeholder="Teléfono (10-15 dígitos)"
+              placeholder="Teléfono (10 dígitos)"
               value={telefono}
               onChange={handleTelefonoChange}
               className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"

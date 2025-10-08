@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Calendar, ChevronDown, Users, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter } from 'lucide-react';
+import { Check, X, Calendar, ChevronDown, Users, Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, RefreshCw } from 'lucide-react';
 
 import toast from 'react-hot-toast'
 import 'react-datepicker/dist/react-datepicker.css';
@@ -34,6 +34,15 @@ export default function ReservasPage() {
   const [justificacionIncumplida, setJustificacionIncumplida] = useState('');
   const [razonSeleccionada, setRazonSeleccionada] = useState('');
   const [servicioModal, setServicioModal] = useState('');
+
+  const [mostrandoReprogramacion, setMostrandoReprogramacion] = useState<{
+    reserva: any;
+  } | null>(null);
+  const [nuevaFechaReserva, setNuevaFechaReserva] = useState<Date>(new Date());
+  const [nuevaHoraReserva, setNuevaHoraReserva] = useState('');
+  const [motivoReprogramacion, setMotivoReprogramacion] = useState('');
+  const [horariosDisponibles, setHorariosDisponibles] = useState<string[]>([]);
+  const [cargandoHorarios, setCargandoHorarios] = useState(false);
 
   // Razones predefinidas para citas incumplidas
   const razonesIncumplidas = [
@@ -215,10 +224,169 @@ export default function ReservasPage() {
     setActualizando(false);
   };
 
+  // Después de la función confirmarActualizacion, agregar:
+
+// Función para obtener horarios disponibles del barbero
+  const obtenerHorariosDisponibles = async (idBarbero: string, fecha: Date) => {
+    setCargandoHorarios(true);
+    
+    try {
+      // Obtener el cliente para sus configuraciones
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('rango_horarios, intervalo_citas, horas_no_disponibles')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!clienteData) return;
+
+      const fechaStr = fecha.toLocaleDateString('sv-SE');
+      const diaSemana = fecha.toLocaleDateString('es-CO', { weekday: 'long' });
+
+      // Obtener reservas existentes del barbero para esa fecha
+      const { data: reservasExistentes } = await supabase
+        .from('reservas')
+        .select('hora')
+        .eq('id_barbero', idBarbero)
+        .eq('fecha', fechaStr)
+        .eq('estado', 'pendiente');
+
+      const horasOcupadas = reservasExistentes?.map(r => r.hora) || [];
+
+      // Generar horarios según configuración del cliente
+      const rangoHorarios = clienteData.rango_horarios || {};
+      const horarioDelDia = rangoHorarios[diaSemana] || { inicio: '08:00', fin: '18:00' };
+      const intervalo = clienteData.intervalo_citas || 45;
+
+      const horarios: string[] = [];
+      let horaActual = horarioDelDia.inicio;
+
+      while (horaActual < horarioDelDia.fin) {
+        if (!horasOcupadas.includes(horaActual)) {
+          horarios.push(horaActual);
+        }
+        
+        // Sumar intervalo
+        const [h, m] = horaActual.split(':').map(Number);
+        const minutosTotales = h * 60 + m + intervalo;
+        const nuevaHora = Math.floor(minutosTotales / 60);
+        const nuevosMinutos = minutosTotales % 60;
+        horaActual = `${String(nuevaHora).padStart(2, '0')}:${String(nuevosMinutos).padStart(2, '0')}`;
+      }
+
+      setHorariosDisponibles(horarios);
+    } catch (error) {
+      console.error('Error obteniendo horarios:', error);
+      toast.error('Error al cargar horarios disponibles');
+    } finally {
+      setCargandoHorarios(false);
+    }
+  };
+
+  // Función para abrir modal de reprogramación
+    const abrirModalReprogramacion = (reserva: any) => {
+      setMostrandoReprogramacion({ reserva });
+      setNuevaFechaReserva(new Date());
+      setNuevaHoraReserva('');
+      setMotivoReprogramacion('');
+      setHorariosDisponibles([]);
+      
+      // Cargar horarios del día actual
+      obtenerHorariosDisponibles(reserva.id_barbero, new Date());
+    };
+
+    // Función para confirmar reprogramación
+    const confirmarReprogramacion = async () => {
+      if (!mostrandoReprogramacion) return;
+      
+      const { reserva } = mostrandoReprogramacion;
+      
+      // Validaciones
+      if (!nuevaHoraReserva) {
+        toast.error('❌ Debes seleccionar una nueva hora');
+        return;
+      }
+      
+      if (!motivoReprogramacion.trim()) {
+        toast.error('❌ Debes especificar el motivo de la reprogramación');
+        return;
+      }
+
+      setActualizando(true);
+      const toastId = toast.loading('Reprogramando cita...');
+
+      try {
+        const nuevaFechaStr = nuevaFechaReserva.toLocaleDateString('sv-SE');
+        
+        // 1. Crear nueva reserva con los datos copiados
+        const { data: nuevaReserva, error: errorNueva } = await supabase
+          .from('reservas')
+          .insert({
+            nombre: reserva.nombre,
+            correo: reserva.correo,
+            telefono: reserva.telefono,
+            fecha: nuevaFechaStr,
+            hora: nuevaHoraReserva,
+            id_cliente: reserva.id_cliente,
+            id_barbero: reserva.id_barbero,
+            id_ser: reserva.id_ser,
+            nota: reserva.nota,
+            estado: 'pendiente',
+            id_reserva_original: reserva.id
+          })
+          .select()
+          .single();
+
+        if (errorNueva) throw errorNueva;
+
+        // 2. Actualizar reserva original como reprogramada
+        const { error: errorOriginal } = await supabase
+          .from('reservas')
+          .update({
+            estado: 'reprogramada',
+            id_reserva_nueva: nuevaReserva.id,
+            fecha_reprogramacion: new Date().toISOString(),
+            motivo_reprogramacion: motivoReprogramacion.trim()
+          })
+          .eq('id', reserva.id);
+
+        if (errorOriginal) throw errorOriginal;
+
+        toast.dismiss(toastId);
+        toast.success('✅ Cita reprogramada exitosamente');
+
+        // Actualizar lista de reservas
+        setReservas((prev) => [
+          ...prev.map(r => 
+            r.id === reserva.id 
+              ? { ...r, estado: 'reprogramada', id_reserva_nueva: nuevaReserva.id, motivo_reprogramacion: motivoReprogramacion }
+              : r
+          ),
+          nuevaReserva
+        ]);
+
+        // Cerrar modal
+        setMostrandoReprogramacion(null);
+        setNuevaHoraReserva('');
+        setMotivoReprogramacion('');
+        
+      } catch (error: any) {
+        toast.dismiss(toastId);
+        console.error('Error reprogramando:', error);
+        toast.error('❌ Error al reprogramar: ' + error.message);
+      } finally {
+        setActualizando(false);
+      }
+    };
+
   const obtenerColorEstado = (estado: string) => {
     switch (estado) {
       case 'cumplida': return 'bg-green-100 text-green-800';
       case 'incumplida': return 'bg-red-100 text-red-800';
+      case 'reprogramada': return 'bg-blue-100 text-blue-800';
       default: return 'bg-yellow-100 text-yellow-800';
     }
   };
@@ -527,46 +695,65 @@ export default function ReservasPage() {
                                         ✅ {obtenerNombreServicio(reserva.id_ser)}
                                       </span>
                                     )}
+
+                                    {/* Mostrar info para citas reprogramadas */}
+                                      {reserva.estado === 'reprogramada' && reserva.motivo_reprogramacion && (
+                                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border-l-2 border-blue-400">
+                                          🔄 {reserva.motivo_reprogramacion}
+                                        </span>
+                                      )}
+                                      
                                   </div>
+                                  
+                                    
 
                                   {/* Botones para reservas pendientes */}
                                   {reserva.estado === 'pendiente' && (
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={() => {
-                                          if (!puedeMarcarse(reserva.fecha, reserva.hora)) {
-                                            toast.error('❌ No puedes marcar esta reserva como cumplida antes de la hora programada');
-                                            return;
-                                          }
-                                          solicitarConfirmacion(reserva.id, 'cumplida', reserva);
-                                        }}
-                                        disabled={actualizando}
-                                        className={`p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors ${
-                                          !puedeMarcarse(reserva.fecha, reserva.hora) ? 'opacity-50' : ''
-                                        }`}
-                                        title="Marcar como cumplida"
-                                      >
-                                        <Check size={18} />
-                                      </button>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => abrirModalReprogramacion(reserva)}
+                                      disabled={actualizando}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                      title="Reprogramar cita"
+                                    >
+                                      <RefreshCw size={18} />
+                                    </button>
 
-                                      <button
-                                        onClick={() => {
-                                          if (!puedeMarcarse(reserva.fecha, reserva.hora)) {
-                                            toast.error('❌ No puedes marcar esta reserva como incumplida antes de la hora programada');
-                                            return;
-                                          }
-                                          solicitarConfirmacion(reserva.id, 'incumplida', reserva);
-                                        }}
-                                        disabled={actualizando}
-                                        className={`p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors ${
-                                          !puedeMarcarse(reserva.fecha, reserva.hora) ? 'opacity-50' : ''
-                                        }`}
-                                        title="Marcar como incumplida"
-                                      >
-                                        <X size={18} />
-                                      </button>
-                                    </div>
-                                  )}
+                                    <button
+                                      onClick={() => {
+                                        if (!puedeMarcarse(reserva.fecha, reserva.hora)) {
+                                          toast.error('❌ No puedes marcar esta reserva como cumplida antes de la hora programada');
+                                          return;
+                                        }
+                                        solicitarConfirmacion(reserva.id, 'cumplida', reserva);
+                                      }}
+                                      disabled={actualizando}
+                                      className={`p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors ${
+                                        !puedeMarcarse(reserva.fecha, reserva.hora) ? 'opacity-50' : ''
+                                      }`}
+                                      title="Marcar como cumplida"
+                                    >
+                                      <Check size={18} />
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        if (!puedeMarcarse(reserva.fecha, reserva.hora)) {
+                                          toast.error('❌ No puedes marcar esta reserva como incumplida antes de la hora programada');
+                                          return;
+                                        }
+                                        solicitarConfirmacion(reserva.id, 'incumplida', reserva);
+                                      }}
+                                      disabled={actualizando}
+                                      className={`p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors ${
+                                        !puedeMarcarse(reserva.fecha, reserva.hora) ? 'opacity-50' : ''
+                                      }`}
+                                      title="Marcar como incumplida"
+                                    >
+                                      <X size={18} />
+                                    </button>
+                                  </div>
+                                )}
                                 </div>
                               </div>
                             ))}
@@ -709,6 +896,159 @@ export default function ReservasPage() {
          </motion.div>
        </div>
      )}
+
+    {/* Modal de Reprogramación */}
+      {mostrandoReprogramacion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-blue-100 p-2 rounded-full">
+                <RefreshCw className="text-blue-600" size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Reprogramar Cita
+              </h3>
+            </div>
+            
+            {/* Info de la cita original */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>Cliente:</strong> {mostrandoReprogramacion.reserva.nombre}
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Fecha actual:</strong> {new Date(mostrandoReprogramacion.reserva.fecha).toLocaleDateString('es-CO', { 
+                  weekday: 'long', 
+                  day: 'numeric', 
+                  month: 'long' 
+                })}
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Hora actual:</strong> {mostrandoReprogramacion.reserva.hora}
+              </p>
+            </div>
+
+            {/* Vista previa del cambio */}
+            {nuevaHoraReserva && (
+              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                <p className="text-sm font-semibold text-blue-900">
+                  📅 Vista previa del cambio:
+                </p>
+                <p className="text-sm text-blue-800 mt-1">
+                  <strong>De:</strong> {new Date(mostrandoReprogramacion.reserva.fecha).toLocaleDateString('es-CO', { 
+                    weekday: 'short', 
+                    day: 'numeric', 
+                    month: 'short' 
+                  })} {mostrandoReprogramacion.reserva.hora}
+                  {' → '}
+                  <strong>A:</strong> {nuevaFechaReserva.toLocaleDateString('es-CO', { 
+                    weekday: 'short', 
+                    day: 'numeric', 
+                    month: 'short' 
+                  })} {nuevaHoraReserva}
+                </p>
+              </div>
+            )}
+
+            {/* Selector de fecha */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nueva fecha: <span className="text-red-500">*</span>
+              </label>
+              <DatePicker
+                selected={nuevaFechaReserva}
+                onChange={(date: Date) => {
+                  setNuevaFechaReserva(date);
+                  setNuevaHoraReserva('');
+                  obtenerHorariosDisponibles(mostrandoReprogramacion.reserva.id_barbero, date);
+                }}
+                dateFormat="yyyy-MM-dd"
+                locale="es"
+                minDate={new Date()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Grid de horas disponibles */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nueva hora: <span className="text-red-500">*</span>
+              </label>
+              
+              {cargandoHorarios ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-600 mt-2">Cargando horarios...</p>
+                </div>
+              ) : horariosDisponibles.length === 0 ? (
+                <div className="text-center py-4 text-gray-600 bg-gray-50 rounded-lg">
+                  <Clock className="mx-auto mb-2 text-gray-400" size={32} />
+                  <p className="text-sm">No hay horarios disponibles para esta fecha</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg">
+                  {horariosDisponibles.map((hora) => (
+                    <button
+                      key={hora}
+                      onClick={() => setNuevaHoraReserva(hora)}
+                      className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                        nuevaHoraReserva === hora
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {hora}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Motivo de reprogramación */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo de la reprogramación: <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={motivoReprogramacion}
+                onChange={(e) => setMotivoReprogramacion(e.target.value)}
+                placeholder="Ej: Cliente solicitó cambio de fecha, Disponibilidad del barbero, etc."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={3}
+                required
+              />
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setMostrandoReprogramacion(null);
+                  setNuevaHoraReserva('');
+                  setMotivoReprogramacion('');
+                }}
+                disabled={actualizando}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarReprogramacion}
+                disabled={actualizando || !nuevaHoraReserva || !motivoReprogramacion.trim()}
+                className={`px-4 py-2 text-sm text-white rounded-md transition-colors bg-blue-600 hover:bg-blue-700 ${
+                  (actualizando || !nuevaHoraReserva || !motivoReprogramacion.trim()) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {actualizando ? 'Reprogramando...' : 'Confirmar Reprogramación'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )} 
+
    </motion.div>
  );
 }
