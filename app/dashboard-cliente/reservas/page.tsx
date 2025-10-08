@@ -246,13 +246,14 @@ export default function ReservasPage() {
       const fechaStr = fecha.toLocaleDateString('sv-SE');
       const diaSemana = fecha.toLocaleDateString('es-CO', { weekday: 'long' });
 
-      // Obtener reservas existentes del barbero para esa fecha
+      // 🆕 Obtener reservas existentes del barbero para esa fecha (EXCLUYENDO la reserva actual)
       const { data: reservasExistentes } = await supabase
         .from('reservas')
         .select('hora')
         .eq('id_barbero', idBarbero)
         .eq('fecha', fechaStr)
-        .eq('estado', 'pendiente');
+        .eq('estado', 'pendiente')
+        .neq('id', mostrandoReprogramacion?.reserva?.id || 0); // 🔥 EXCLUIR reserva actual
 
       const horasOcupadas = reservasExistentes?.map(r => r.hora) || [];
 
@@ -277,7 +278,32 @@ export default function ReservasPage() {
         horaActual = `${String(nuevaHora).padStart(2, '0')}:${String(nuevosMinutos).padStart(2, '0')}`;
       }
 
-      setHorariosDisponibles(horarios);
+
+
+      const horasNoDisponiblesDia = clienteData.horas_no_disponibles?.[diaSemana] || [];
+        let horasFiltradas = horarios.filter(hora => !horasNoDisponiblesDia.includes(hora));
+
+        // 🆕 FILTRO ADICIONAL: Si la fecha seleccionada es HOY, filtrar horas que ya pasaron
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
+        if (fechaStr === fechaHoy) {
+          const ahora = new Date();
+          const horaActualNum = ahora.getHours();
+          const minutoActualNum = ahora.getMinutes();
+          const minutosActuales = horaActualNum * 60 + minutoActualNum;
+          
+          // Agregar margen de tiempo (15 minutos de anticipación mínima)
+          const margenMinutos = 15;
+          const minutosConMargen = minutosActuales + margenMinutos;
+          
+          horasFiltradas = horasFiltradas.filter(hora => {
+            const [h, m] = hora.split(':').map(Number);
+            const minutosHora = h * 60 + m;
+            return minutosHora > minutosConMargen;
+          });
+        }
+
+        setHorariosDisponibles(horasFiltradas);
     } catch (error) {
       console.error('Error obteniendo horarios:', error);
       toast.error('Error al cargar horarios disponibles');
@@ -289,13 +315,19 @@ export default function ReservasPage() {
   // Función para abrir modal de reprogramación
     const abrirModalReprogramacion = (reserva: any) => {
       setMostrandoReprogramacion({ reserva });
-      setNuevaFechaReserva(new Date());
+      
+      // Inicializar con el día siguiente como mínimo
+      const manana = new Date();
+      manana.setDate(manana.getDate() + 1);
+      manana.setHours(0, 0, 0, 0); // Resetear hora a medianoche
+      
+      setNuevaFechaReserva(manana);
       setNuevaHoraReserva('');
       setMotivoReprogramacion('');
       setHorariosDisponibles([]);
       
-      // Cargar horarios del día actual
-      obtenerHorariosDisponibles(reserva.id_barbero, new Date());
+      // Cargar horarios del día siguiente
+      obtenerHorariosDisponibles(reserva.id_barbero, manana);
     };
 
     // Función para confirmar reprogramación
@@ -702,7 +734,7 @@ export default function ReservasPage() {
                                           🔄 {reserva.motivo_reprogramacion}
                                         </span>
                                       )}
-                                      
+
                                   </div>
                                   
                                     
@@ -968,6 +1000,11 @@ export default function ReservasPage() {
                 dateFormat="yyyy-MM-dd"
                 locale="es"
                 minDate={new Date()}
+                maxDate={(() => {
+                  const maxDate = new Date();
+                  maxDate.setDate(maxDate.getDate() + 30); // 🔥 Máximo 30 días de anticipación
+                  return maxDate;
+                })()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
