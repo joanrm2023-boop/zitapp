@@ -17,10 +17,9 @@ export default function Privacidad() {
               <a href="/" className="text-gray-600 hover:text-gray-900 transition-colors">
                 Inicio
               </a>
-              <a href="/funcionalidades" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Funcionalidades
-              </a>
-              <a href="/planes" className="text-gray-600 hover:text-gray-900 transition-colors">
+             
+              
+              <a href="/planes-nuevos" className="text-gray-600 hover:text-gray-900 transition-colors">
                 Planes
               </a>
               <a href="/login" className="text-gray-600 hover:text-gray-900 transition-colors">
@@ -313,7 +312,7 @@ export default function Privacidad() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <a 
-                    href="https://wa.me/573152720293?text=Hola,%20quiero%20ejercer%20mis%20derechos%20sobre%20mis%20datos%20personales"
+                    href="https://wa.me/573001334528?text=Hola,%20quiero%20ejercer%20mis%20derechos%20sobre%20mis%20datos%20personales"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
@@ -325,8 +324,7 @@ export default function Privacidad() {
                     href="mailto:privacidad@zitapp.com"
                     className="inline-flex items-center gap-2 border border-blue-600 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors text-sm"
                   >
-                    <Mail size={16} />
-                    Email
+                
                   </a>
                 </div>
               </div>
@@ -351,13 +349,13 @@ export default function Privacidad() {
                     <h4 className="font-semibold text-gray-900 mb-3">Para consultas sobre privacidad:</h4>
                     <div className="space-y-2">
                       <a 
-                        href="https://wa.me/573152720293?text=Hola,%20tengo%20preguntas%20sobre%20la%20política%20de%20privacidad%20de%20Zitapp"
+                        href="https://wa.me/573001334528?text=Hola,%20tengo%20preguntas%20sobre%20la%20política%20de%20privacidad%20de%20Zitapp"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
                       >
                         <Phone size={16} />
-                        WhatsApp: +57 315 272 0293
+                        WhatsApp: +57 300 133 4528
                       </a>
                       <a 
                         href="mailto:privacidad@zitapp.com"
@@ -422,15 +420,14 @@ export default function Privacidad() {
               <h4 className="font-semibold mb-4">Producto</h4>
               <div className="space-y-2 text-gray-400">
                 <div><a href="/planes" className="hover:text-white transition-colors">Precios</a></div>
-                <div><a href="/funcionalidades" className="hover:text-white transition-colors">Funcionalidades</a></div>
               </div>
             </div>
             
             <div>
               <h4 className="font-semibold mb-4">Soporte</h4>
               <div className="space-y-2 text-gray-400">
-                <div><a href="https://wa.me/573152720293?text=Hola,%20necesito%20ayuda%20con%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto</a></div>
-                <div><a href="https://wa.me/573152720293?text=Hola,%20tengo%20una%20pregunta%20sobre%20el%20uso%20de%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Centro de ayuda</a></div>
+                <div><a href="https://wa.me/573001334528?text=Hola,%20necesito%20ayuda%20con%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contacto</a></div>
+                <div><a href="https://wa.me/573001334528?text=Hola,%20tengo%20una%20pregunta%20sobre%20el%20uso%20de%20Zitapp" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Centro de ayuda</a></div>
               </div>
             </div>
             
