@@ -187,29 +187,53 @@ function ReservarSlugContent() {
 
 
   // Cargar horas disponibles según rango y día
-    useEffect(() => {
-      if (!cliente || !cliente.rango_horarios || !cliente.intervalo_citas || !fecha) {
-        setHoras([]);
-        return;
-      }
+  useEffect(() => {
+    if (!cliente || !cliente.rango_horarios || !cliente.intervalo_citas || !fecha) {
+      console.log('🛑 No se generan horas - Faltan datos:', { 
+        tieneCliente: !!cliente, 
+        tieneRango: !!cliente?.rango_horarios,
+        tieneIntervalo: !!cliente?.intervalo_citas,
+        fecha 
+      });
+      setHoras([]);
+      return;
+    }
 
-      // Si el día está bloqueado específicamente, no mostrar horas
-      if (diasBloqueados.includes(fecha)) {
-        setHoras([]);
-        return;
-      }
+    console.log('📅 === GENERANDO HORAS PARA:', fecha, '===');
+    console.log('🚫 Días bloqueados específicos:', diasBloqueados);
+    console.log('❌ ¿Incluye esta fecha?:', diasBloqueados.includes(fecha));
+
+    // Si el día está bloqueado específicamente, no mostrar horas
+    if (diasBloqueados.includes(fecha)) {
+      console.log('🛑 DÍA BLOQUEADO ESPECÍFICAMENTE');
+      setHoras([]);
+      return;
+    }
 
     try {
       const fechaSeleccionada = new Date(fecha + 'T00:00:00');
-      const diasSemana = ['domingo','lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', ];
+      const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+      
       const diaActual = diasSemana[fechaSeleccionada.getDay()];
+
+      console.log('📆 Día de la semana detectado:', diaActual);
+      console.log('📆 Índice getDay():', fechaSeleccionada.getDay());
+      console.log('⚙️ Configuración rango_horarios:', cliente.rango_horarios);
 
       const claveNormalizada = diaActual.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const claves = Object.keys(cliente.rango_horarios || {});
       const claveReal = claves.find(k => k.normalize('NFD').replace(/[\u0300-\u036f]/g, '') === claveNormalizada);
+      
+      console.log('🔑 Clave buscada (normalizada):', claveNormalizada);
+      console.log('🔑 Claves disponibles en BD:', claves);
+      console.log('🔑 Clave encontrada:', claveReal);
+      
       const rangoDia = cliente.rango_horarios?.[claveReal];
 
+      console.log('⏰ Rango del día encontrado:', rangoDia);
+
       if (!rangoDia || !rangoDia.inicio || !rangoDia.fin) {
+        console.log('🛑 NO HAY RANGO CONFIGURADO PARA ESTE DÍA');
         setHoras([]);
         return;
       }
@@ -217,6 +241,10 @@ function ReservarSlugContent() {
       const [inicioH, inicioM] = rangoDia.inicio.split(':').map(Number);
       const [finH, finM] = rangoDia.fin.split(':').map(Number);
       const intervalo = cliente.intervalo_citas;
+
+      console.log('⏰ Hora inicio:', `${inicioH}:${inicioM}`);
+      console.log('⏰ Hora fin:', `${finH}:${finM}`);
+      console.log('⏰ Intervalo:', intervalo);
 
       const start = inicioH * 60 + inicioM;
       const end = finH * 60 + finM;
@@ -228,35 +256,55 @@ function ReservarSlugContent() {
         horasGeneradas.push(`${h}:${m}`);
       }
 
+      console.log('🕐 Horas generadas inicialmente:', horasGeneradas);
+
       // Filtrar horas no disponibles del cliente
       const horasNoDisponiblesDia = cliente.horas_no_disponibles?.[claveReal] || [];
+      console.log('🚫 Horas NO disponibles configuradas:', horasNoDisponiblesDia);
+      
       let horasFiltradas = horasGeneradas.filter(hora => !horasNoDisponiblesDia.includes(hora));
+      console.log('✅ Después de filtrar horas no disponibles:', horasFiltradas);
 
       // NUEVA LÓGICA: Si la fecha seleccionada es HOY, filtrar horas que ya pasaron
       const fechaHoy = new Date().toISOString().split('T')[0];
+      console.log('📅 Fecha de HOY:', fechaHoy);
+      console.log('📅 ¿Es hoy?:', fecha === fechaHoy);
+      
       if (fecha === fechaHoy) {
         const ahora = new Date();
         const horaActual = ahora.getHours();
         const minutoActual = ahora.getMinutes();
         const minutosActuales = horaActual * 60 + minutoActual;
         
+        console.log('🕐 Hora actual:', `${horaActual}:${minutoActual} (${minutosActuales} minutos)`);
+        
         // Agregar margen de tiempo (15 minutos de anticipación mínima)
         const margenMinutos = 15;
         const minutosConMargen = minutosActuales + margenMinutos;
         
+        console.log('⏰ Minutos con margen (+15min):', minutosConMargen);
+        
         horasFiltradas = horasFiltradas.filter(hora => {
           const [h, m] = hora.split(':').map(Number);
           const minutosHora = h * 60 + m;
-          return minutosHora > minutosConMargen;
+          const pasaFiltro = minutosHora > minutosConMargen;
+          if (!pasaFiltro) {
+            console.log(`❌ Hora ${hora} filtrada (${minutosHora} <= ${minutosConMargen})`);
+          }
+          return pasaFiltro;
         });
+        
+        console.log('✅ Después de filtrar horas pasadas:', horasFiltradas);
       }
 
+      console.log('🎯 HORAS FINALES A MOSTRAR:', horasFiltradas);
       setHoras(horasFiltradas);
+      
     } catch (err) {
-      console.error('Error generando horas:', err);
+      console.error('❌ Error generando horas:', err);
       setHoras([]);
     }
-  }, [cliente, fecha]);
+  }, [cliente, fecha, diasBloqueados]);
 
   // Consultar horas ocupadas para barbero y fecha
   useEffect(() => {
