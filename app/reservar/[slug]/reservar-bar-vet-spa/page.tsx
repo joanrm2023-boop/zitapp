@@ -266,15 +266,20 @@ function ReservarSlugContent() {
       console.log('✅ Después de filtrar horas no disponibles:', horasFiltradas);
 
       // NUEVA LÓGICA: Si la fecha seleccionada es HOY, filtrar horas que ya pasaron
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      console.log('📅 Fecha de HOY:', fechaHoy);
-      console.log('📅 ¿Es hoy?:', fecha === fechaHoy);
-      
-      if (fecha === fechaHoy) {
         const ahora = new Date();
-        const horaActual = ahora.getHours();
-        const minutoActual = ahora.getMinutes();
-        const minutosActuales = horaActual * 60 + minutoActual;
+        const año = ahora.getFullYear();
+        const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+        const dia = String(ahora.getDate()).padStart(2, '0');
+        const fechaHoy = `${año}-${mes}-${dia}`;
+
+        console.log('📅 Fecha de HOY (local):', fechaHoy);
+        console.log('📅 Fecha seleccionada:', fecha);
+        console.log('📅 ¿Es hoy?:', fecha === fechaHoy);
+
+        if (fecha === fechaHoy) {
+          const horaActual = ahora.getHours();
+          const minutoActual = ahora.getMinutes();
+          const minutosActuales = horaActual * 60 + minutoActual;
         
         console.log('🕐 Hora actual:', `${horaActual}:${minutoActual} (${minutosActuales} minutos)`);
         
