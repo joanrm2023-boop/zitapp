@@ -284,10 +284,13 @@ export default function ReservasPage() {
         let horasFiltradas = horarios.filter(hora => !horasNoDisponiblesDia.includes(hora));
 
         // 🆕 FILTRO ADICIONAL: Si la fecha seleccionada es HOY, filtrar horas que ya pasaron
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const ahora = new Date();
+        const año = ahora.getFullYear();
+        const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+        const dia = String(ahora.getDate()).padStart(2, '0');
+        const fechaHoy = `${año}-${mes}-${dia}`;
 
         if (fechaStr === fechaHoy) {
-          const ahora = new Date();
           const horaActualNum = ahora.getHours();
           const minutoActualNum = ahora.getMinutes();
           const minutosActuales = horaActualNum * 60 + minutoActualNum;
@@ -304,6 +307,8 @@ export default function ReservasPage() {
         }
 
         setHorariosDisponibles(horasFiltradas);
+
+
     } catch (error) {
       console.error('Error obteniendo horarios:', error);
       toast.error('Error al cargar horarios disponibles');
