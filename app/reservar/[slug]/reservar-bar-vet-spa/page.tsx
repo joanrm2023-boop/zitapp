@@ -605,7 +605,8 @@ function ReservarSlugContent() {
           .select('id')
           .eq('id_barbero', barberoSeleccionado)
           .eq('fecha', fecha)
-          .eq('hora', horaSeleccionada);
+          .eq('hora', horaSeleccionada)
+          .eq('estado', 'pendiente'); // ✅ Solo validar citas pendientes
 
         if (reservasExistentes && reservasExistentes.length > 0) {
           setMensaje('❌ Esta hora ya está reservada con este profesional.');
