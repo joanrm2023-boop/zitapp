@@ -44,6 +44,7 @@ export default function ReservasPage() {
   const [motivoReprogramacion, setMotivoReprogramacion] = useState('');
   const [horariosDisponibles, setHorariosDisponibles] = useState<string[]>([]);
   const [cargandoHorarios, setCargandoHorarios] = useState(false);
+  const [barberoSeleccionado, setBarberoSeleccionado] = useState<string>('');
 
   // Razones predefinidas para citas incumplidas
   const razonesIncumplidas = [
@@ -323,6 +324,9 @@ export default function ReservasPage() {
   // Función para abrir modal de reprogramación
     const abrirModalReprogramacion = (reserva: any) => {
       setMostrandoReprogramacion({ reserva });
+
+        // Inicializar con el barbero actual de la reserva
+        setBarberoSeleccionado(reserva.id_barbero);
       
       // Inicializar con el día siguiente como mínimo
       const manana = new Date();
@@ -371,7 +375,7 @@ export default function ReservasPage() {
             fecha: nuevaFechaStr,
             hora: nuevaHoraReserva,
             id_cliente: reserva.id_cliente,
-            id_barbero: reserva.id_barbero,
+            id_barbero: barberoSeleccionado,
             id_ser: reserva.id_ser,
             nota: reserva.nota,
             estado: 'pendiente',
@@ -994,6 +998,38 @@ export default function ReservasPage() {
               </p>
             </div>
 
+            {/* Selector de profesional */}
+              {barberos.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Profesional: <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Users className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" size={16} />
+                    <select
+                      value={barberoSeleccionado}
+                      onChange={(e) => {
+                        setBarberoSeleccionado(e.target.value);
+                        setNuevaHoraReserva('');
+                        obtenerHorariosDisponibles(e.target.value, nuevaFechaReserva);
+                      }}
+                      className="pl-8 pr-8 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white appearance-none"
+                    >
+                      {barberos.map((barbero) => (
+                        <option key={barbero.id_barbero} value={barbero.id_barbero}>
+                          {barbero.nombre_barbero}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             {/* Vista previa del cambio */}
               {nuevaHoraReserva && (
                 <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
@@ -1026,7 +1062,7 @@ export default function ReservasPage() {
                 onChange={(date: Date) => {
                   setNuevaFechaReserva(date);
                   setNuevaHoraReserva('');
-                  obtenerHorariosDisponibles(mostrandoReprogramacion.reserva.id_barbero, date);
+                  obtenerHorariosDisponibles(barberoSeleccionado, date);
                 }}
                 dateFormat="yyyy-MM-dd"
                 locale="es"
