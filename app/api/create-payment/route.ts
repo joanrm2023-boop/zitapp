@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
-const WOMPI_PUBLIC_KEY = 'pub_test_xHSVWM0rB3WZk5kMKZoKIyo5ZUP51zvT';
-const WOMPI_PRIVATE_KEY = 'prv_test_eFdW2YMHDJsFm1SZm9EAPu9qnbXyYuv3';
+const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY!;
+const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY!;
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Llamada a la API de Wompi para crear PAYMENT LINK
     console.log('Llamando a Wompi Payment Links...');
-    const wompiResponse = await fetch('https://sandbox.wompi.co/v1/payment_links', {
+    const wompiResponse = await fetch('https://production.wompi.co/v1/payment_links', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${WOMPI_PRIVATE_KEY}`,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
 async function getAcceptanceToken() {
   try {
     console.log('Obteniendo acceptance token...');
-    const response = await fetch('https://sandbox.wompi.co/v1/merchants/' + WOMPI_PUBLIC_KEY, {
+    const response = await fetch('https://production.wompi.co/v1/merchants/' + WOMPI_PUBLIC_KEY, {
       headers: {
         'Authorization': `Bearer ${WOMPI_PUBLIC_KEY}`,
       },
