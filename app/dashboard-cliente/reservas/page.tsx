@@ -23,6 +23,7 @@ export default function ReservasPage() {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'pendiente' | 'cumplida' | 'incumplida'>('todas');
   const [servicios, setServicios] = useState<any[]>([]);
+  const [cliente, setCliente] = useState<any>(null);
   
   // Estados para confirmación y justificación
   const [mostrandoConfirmacion, setMostrandoConfirmacion] = useState<{
@@ -66,7 +67,7 @@ export default function ReservasPage() {
       // PRIMERO obtener el id_cliente del usuario autenticado
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('id_cliente')
+        .select('id_cliente, modo_demo')
         .eq('user_id', user.id)
         .single();
 
@@ -76,6 +77,7 @@ export default function ReservasPage() {
         return;
       }
 
+      setCliente(clienteData); // 
       const idCliente = clienteData.id_cliente;
 
       // Cargar barberos activos del cliente específico
@@ -290,7 +292,8 @@ export default function ReservasPage() {
         const dia = String(ahora.getDate()).padStart(2, '0');
         const fechaHoy = `${año}-${mes}-${dia}`;
 
-        if (fechaStr === fechaHoy) {
+        // 🎭 Si está en modo demo, NO filtrar horas pasadas
+        if (fechaStr === fechaHoy && !cliente?.modo_demo) {
           const horaActualNum = ahora.getHours();
           const minutoActualNum = ahora.getMinutes();
           const minutosActuales = horaActualNum * 60 + minutoActualNum;
@@ -469,6 +472,23 @@ export default function ReservasPage() {
       <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-900">
         Reservas
       </h1>
+
+      {/* 🎭 Indicador de modo demo */}
+        {cliente?.modo_demo && (
+          <div className="mb-4 p-3 bg-orange-50 border-l-4 border-orange-400 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎭</span>
+              <div>
+                <p className="text-sm font-semibold text-orange-800">
+                  Modo Demostración Activo
+                </p>
+                <p className="text-xs text-orange-600">
+                  Las restricciones de tiempo están deshabilitadas para demostraciones
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Tarjetas de Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

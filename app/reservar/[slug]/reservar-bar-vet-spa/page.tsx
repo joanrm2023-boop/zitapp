@@ -266,6 +266,7 @@ function ReservarSlugContent() {
       console.log('✅ Después de filtrar horas no disponibles:', horasFiltradas);
 
       // NUEVA LÓGICA: Si la fecha seleccionada es HOY, filtrar horas que ya pasaron
+        // 🎭 EXCEPTO si el cliente está en modo demo
         const ahora = new Date();
         const año = ahora.getFullYear();
         const mes = String(ahora.getMonth() + 1).padStart(2, '0');
@@ -275,8 +276,10 @@ function ReservarSlugContent() {
         console.log('📅 Fecha de HOY (local):', fechaHoy);
         console.log('📅 Fecha seleccionada:', fecha);
         console.log('📅 ¿Es hoy?:', fecha === fechaHoy);
+        console.log('🎭 ¿Modo demo?:', cliente?.modo_demo);
 
-        if (fecha === fechaHoy) {
+        // 🎭 Si está en modo demo, NO filtrar horas pasadas
+        if (fecha === fechaHoy && !cliente?.modo_demo) {
           const horaActual = ahora.getHours();
           const minutoActual = ahora.getMinutes();
           const minutosActuales = horaActual * 60 + minutoActual;
@@ -783,6 +786,14 @@ function ReservarSlugContent() {
             <h1 className="text-2xl font-bold text-gray-800 capitalize">
               Reserva en {cliente.nombre}
             </h1>
+          )}
+          {/* 🎭 Indicador de modo demo */}
+          {cliente?.modo_demo && (
+            <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded-lg">
+              <p className="text-xs text-orange-800 text-center font-medium">
+                🎭 Modo demostración - Todas las horas disponibles
+              </p>
+            </div>
           )}
         </div>
 

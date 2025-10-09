@@ -286,7 +286,7 @@ export default function PlanesNuevosPage() {
                         </li>
                         <li className="flex items-center gap-2">
                         <Check size={12} className="text-blue-500" />
-                        <span>Templates profesionales personalizados</span>
+                        <span>Templates profesional </span>
                         </li>
                         <li className="flex items-center gap-2">
                         <Check size={12} className="text-blue-500" />
