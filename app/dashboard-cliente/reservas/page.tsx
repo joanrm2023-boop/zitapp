@@ -437,9 +437,21 @@ export default function ReservasPage() {
     };
 
   const puedeMarcarse = (fecha: string, hora: string) => {
+    console.log('🔍 DEBUG puedeMarcarse:');
+    console.log('   - cliente:', cliente);
+    console.log('   - cliente?.modo_demo:', cliente?.modo_demo);
+    
+    // 🎭 Si está en modo demo, siempre puede marcarse
+    if (cliente?.modo_demo) {
+      console.log('✅ MODO DEMO - Puede marcarse');
+      return true;
+    }
+    
     const ahora = new Date()
     const fechaHoraReserva = new Date(`${fecha}T${hora}`)
-    return ahora >= fechaHoraReserva
+    const resultado = ahora >= fechaHoraReserva;
+    console.log('   - Resultado normal:', resultado);
+    return resultado;
   }
 
   const toggleBarbero = (id: string) => {
