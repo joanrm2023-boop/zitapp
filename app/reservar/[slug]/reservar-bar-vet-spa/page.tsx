@@ -327,7 +327,8 @@ function ReservarSlugContent() {
           .from('reservas')
           .select('hora')
           .eq('id_barbero', barberoSeleccionado)
-          .eq('fecha', fecha);
+          .eq('fecha', fecha)
+          .eq('estado', 'pendiente'); // ✅ Solo considerar citas pendientes como ocupadas
         if (error) {
           console.error('Error cargando reservas:', error);
           setHorasOcupadas([]);
