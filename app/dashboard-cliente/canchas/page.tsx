@@ -20,6 +20,11 @@ export default function CanchasPage() {
   const [planCliente, setPlanCliente] = useState<string>('');
   const [limitePlan, setLimitePlan] = useState<number>(0);
   const [idCliente, setIdCliente] = useState<string>('');
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
+  const [editImagenUrl, setEditImagenUrl] = useState('');
+  const [editImagenFile, setEditImagenFile] = useState<File | null>(null);
+ 
 
   useEffect(() => setMounted(true), []);
 
@@ -127,15 +132,54 @@ export default function CanchasPage() {
       return;
     }
 
+    setSubiendoImagen(true);
+    let imagenUrl = null;
+
+    // 🆕 Subir imagen si existe
+    if (imagenFile) {
+      try {
+        const fileExt = imagenFile.name.split('.').pop();
+        const fileName = `${idCliente}/${Date.now()}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('canchas-imagenes')
+          .upload(fileName, imagenFile);
+
+        if (uploadError) {
+          console.error('Error subiendo imagen:', uploadError);
+          setMensajeError('Error al subir la imagen.');
+          setTimeout(() => setMensajeError(''), 3000);
+          setSubiendoImagen(false);
+          return;
+        }
+
+        // Obtener URL pública
+        const { data: urlData } = supabase.storage
+          .from('canchas-imagenes')
+          .getPublicUrl(fileName);
+
+        imagenUrl = urlData.publicUrl;
+      } catch (err) {
+        console.error('Error procesando imagen:', err);
+        setMensajeError('Error al procesar la imagen.');
+        setTimeout(() => setMensajeError(''), 3000);
+        setSubiendoImagen(false);
+        return;
+      }
+    }
+
     const { data, error } = await supabase
       .from('canchas')
       .insert([{
         nombre_cancha: nombre.trim(),
         descripcion_cancha: descripcion.trim(),
+        imagen_url: imagenUrl,
         activo: true,
         id_cliente: idCliente
       }])
       .select();
+
+    setSubiendoImagen(false);
 
     if (error) {
       console.error('Error al agregar cancha:', error.message);
@@ -145,6 +189,11 @@ export default function CanchasPage() {
       setCanchas((prev) => [...prev, ...data]);
       setNombre('');
       setDescripcion('');
+      setImagenFile(null);
+      // Limpiar el input de archivo
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+      
       setMensajeVisible(true);
       setTimeout(() => setMensajeVisible(false), 3000);
     }
@@ -154,12 +203,16 @@ export default function CanchasPage() {
     setEditandoId(cancha.id_cancha);
     setEditNombre(cancha.nombre_cancha);
     setEditDescripcion(cancha.descripcion_cancha || '');
+    setEditImagenUrl(cancha.imagen_url || '');
+    setEditImagenFile(null);
   };
 
   const cancelarEdicion = () => {
     setEditandoId(null);
     setEditNombre('');
     setEditDescripcion('');
+    setEditImagenUrl('');
+    setEditImagenFile(null);
   };
 
   const guardarEdicion = async () => {
@@ -176,14 +229,68 @@ export default function CanchasPage() {
       return;
     }
 
+    setSubiendoImagen(true);
+    let nuevaImagenUrl = editImagenUrl; // Mantener URL actual por defecto
+
+    // 🆕 Si hay nueva imagen, subirla
+    if (editImagenFile) {
+      try {
+        const fileExt = editImagenFile.name.split('.').pop();
+        const fileName = `${idCliente}/${Date.now()}.${fileExt}`;
+
+        // Subir nueva imagen
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('canchas-imagenes')
+          .upload(fileName, editImagenFile);
+
+        if (uploadError) {
+          console.error('Error subiendo imagen:', uploadError);
+          setMensajeError('Error al subir la nueva imagen.');
+          setTimeout(() => setMensajeError(''), 3000);
+          setSubiendoImagen(false);
+          return;
+        }
+
+        // Obtener URL pública de la nueva imagen
+        const { data: urlData } = supabase.storage
+          .from('canchas-imagenes')
+          .getPublicUrl(fileName);
+
+        nuevaImagenUrl = urlData.publicUrl;
+
+        // 🗑️ Opcional: Eliminar imagen anterior si existe
+        if (editImagenUrl) {
+          try {
+            const oldFileName = editImagenUrl.split('/canchas-imagenes/')[1];
+            if (oldFileName) {
+              await supabase.storage
+                .from('canchas-imagenes')
+                .remove([oldFileName]);
+            }
+          } catch (err) {
+            console.log('No se pudo eliminar imagen anterior:', err);
+          }
+        }
+      } catch (err) {
+        console.error('Error procesando imagen:', err);
+        setMensajeError('Error al procesar la imagen.');
+        setTimeout(() => setMensajeError(''), 3000);
+        setSubiendoImagen(false);
+        return;
+      }
+    }
+
     const { data, error } = await supabase
       .from('canchas')
       .update({
         nombre_cancha: editNombre.trim(),
         descripcion_cancha: editDescripcion.trim(),
+        imagen_url: nuevaImagenUrl,
       })
       .eq('id_cancha', editandoId)
       .select();
+
+    setSubiendoImagen(false);
 
     if (error) {
       setMensajeError('Error al guardar los cambios.');
@@ -314,6 +421,30 @@ export default function CanchasPage() {
               />
             </div>
           </div>
+          {/* 🆕 NUEVO CAMPO DE IMAGEN */}
+            <div className="flex flex-col gap-2 md:col-span-2">
+              <label className="text-sm font-medium text-gray-700">Imagen de la cancha (opcional):</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Validar tamaño (máximo 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                      setMensajeError('La imagen no puede superar 5MB');
+                      setTimeout(() => setMensajeError(''), 3000);
+                      return;
+                    }
+                    setImagenFile(file);
+                  }
+                }}
+                className="pl-2 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {imagenFile && (
+                <p className="text-xs text-green-600">✅ Imagen seleccionada: {imagenFile.name}</p>
+              )}
+            </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-700">Descripción:</label>
             <div className="relative">
@@ -352,14 +483,16 @@ export default function CanchasPage() {
 
         <button
           onClick={handleAgregar}
-          disabled={canchas.length >= limitePlan}
+          disabled={canchas.length >= limitePlan || subiendoImagen}
           className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-            canchas.length >= limitePlan
+            canchas.length >= limitePlan || subiendoImagen
               ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}
         >
-          {canchas.length >= limitePlan 
+          {subiendoImagen 
+            ? '⏳ Subiendo imagen...'
+            : canchas.length >= limitePlan 
             ? `Límite alcanzado (${limitePlan} máximo)`
             : 'Agregar cancha'
           }
@@ -409,17 +542,59 @@ export default function CanchasPage() {
                       />
                       <p className="text-xs text-gray-500">{editDescripcion.length}/200 caracteres</p>
                     </div>
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700">Cambiar imagen de la cancha:</label>
+                      
+                      {/* Mostrar imagen actual si existe */}
+                      {editImagenUrl && !editImagenFile && (
+                        <div className="mb-2">
+                          <p className="text-xs text-gray-600 mb-1">Imagen actual:</p>
+                          <img 
+                            src={editImagenUrl} 
+                            alt="Imagen actual"
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300"
+                          />
+                        </div>
+                      )}
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              setMensajeError('La imagen no puede superar 5MB');
+                              setTimeout(() => setMensajeError(''), 3000);
+                              return;
+                            }
+                            setEditImagenFile(file);
+                          }
+                        }}
+                        className="p-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {editImagenFile && (
+                        <p className="text-xs text-green-600">✅ Nueva imagen seleccionada: {editImagenFile.name}</p>
+                      )}
+                      <p className="text-xs text-gray-500">Si no seleccionas una nueva imagen, se mantendrá la actual.</p>
+                    </div>
                   </div>
                   <div className="flex gap-4">
                     <button
                       onClick={guardarEdicion}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors"
+                      disabled={subiendoImagen}
+                      className={`px-4 py-2 rounded-md transition-colors ${
+                        subiendoImagen
+                          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
                     >
-                      Guardar
+                      {subiendoImagen ? '⏳ Guardando...' : 'Guardar'}
                     </button>
                     <button
                       onClick={cancelarEdicion}
-                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md transition-colors"
+                      disabled={subiendoImagen}
+                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md transition-colors disabled:opacity-50"
                     >
                       Cancelar
                     </button>
@@ -429,8 +604,18 @@ export default function CanchasPage() {
                 <div className="p-6">
                   <div className="flex justify-between items-start">
                     <div className="flex items-start gap-4 flex-1">
-                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-full flex-shrink-0">
-                        <MapPin className="text-white" size={20} />
+                      <div className="flex-shrink-0">
+                        {c.imagen_url ? (
+                          <img 
+                            src={c.imagen_url} 
+                            alt={c.nombre_cancha}
+                            className="w-16 h-16 object-cover rounded-lg border-2 border-blue-500"
+                          />
+                        ) : (
+                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-full">
+                            <MapPin className="text-white" size={20} />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-800 text-lg">{c.nombre_cancha}</h3>
