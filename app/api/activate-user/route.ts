@@ -97,27 +97,39 @@ export async function POST(request: NextRequest) {
     console.log('Estado de suscripción actual:', cliente.estado_suscripcion);
     console.log('Fecha de vencimiento actual del cliente:', cliente.fecha_vencimiento_plan);
 
-    let fechaVencimiento;
+    // Obtener fecha actual (solo fecha, sin hora)
+    const hoyStr = new Date().toISOString().split('T')[0]; // '2025-10-29'
+
+    let fechaVencimientoStr;
+
     if (cliente.fecha_vencimiento_plan && cliente.estado_suscripcion !== 'trial') {
-      fechaVencimiento = new Date(cliente.fecha_vencimiento_plan);
-      const hoy = new Date();
+      // Cliente con suscripción pagada previa
+      const fechaVencActual = cliente.fecha_vencimiento_plan; // Ya es DATE: '2025-10-30'
       
-      if (fechaVencimiento < hoy) {
+      // Comparar solo fechas (sin horas)
+      if (fechaVencActual < hoyStr) {
+        // Ya venció, empezar desde hoy
         console.log('Suscripción pagada ya vencida, iniciando desde hoy');
-        fechaVencimiento = new Date();
+        fechaVencimientoStr = hoyStr;
       } else {
+        // Aún vigente, mantener fecha actual para sumar días
         console.log('Renovación de suscripción pagada, manteniendo días restantes');
+        fechaVencimientoStr = fechaVencActual;
       }
     } else {
+      // Primera compra o fin de trial, iniciar desde hoy
       console.log('Primera compra o fin de trial, iniciando desde hoy');
-      fechaVencimiento = new Date();
+      fechaVencimientoStr = hoyStr;
     }
 
     // Agregar 30 días
+    const fechaVencimiento = new Date(fechaVencimientoStr + 'T00:00:00');
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-    const fechaVencimientoISO = fechaVencimiento.toISOString();
 
-    console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoISO);
+    // Convertir a formato DATE (solo fecha, sin hora)
+    const fechaVencimientoFinal = fechaVencimiento.toISOString().split('T')[0]; // '2025-11-28'
+
+    console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoFinal);
 
     // Actualizar cliente
     const { error: updateError } = await supabase
@@ -126,7 +138,7 @@ export async function POST(request: NextRequest) {
         plan: planId || 'basico',
         suscripcion_activa: true,
         fecha_cambio_estado: new Date().toISOString(),
-        fecha_vencimiento_plan: fechaVencimientoISO,
+        fecha_vencimiento_plan: fechaVencimientoFinal, // ✅ CAMBIO AQUÍ
         notificaciones_activas: notificacionesIncluidas,
         activo: 'Activo',
         estado_suscripcion: 'activa'
@@ -163,7 +175,7 @@ export async function POST(request: NextRequest) {
     console.log('Cliente activado exitosamente:', email);
     console.log('Plan asignado:', planId);
     console.log('Notificaciones activas:', notificacionesIncluidas);
-    console.log('Fecha de vencimiento:', fechaVencimientoISO);
+    console.log('Fecha de vencimiento:', fechaVencimientoFinal);
 
     // Marcar transacción como completada
     try {
@@ -192,7 +204,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       message: 'Usuario activado correctamente',
-      fechaVencimiento: fechaVencimientoISO,
+      fechaVencimiento: fechaVencimientoFinal, // ✅ CAMBIO AQUÍ
       estadoSuscripcion: 'activa',
       estadoCliente: clienteVerificacion?.activo || 'Activo',
       notificacionesActivas: notificacionesIncluidas,

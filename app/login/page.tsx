@@ -40,17 +40,22 @@ export default function LoginPage() {
     return dias
   }
 
-  // Función para calcular días hasta vencimiento
+  // Función para calcular días hasta vencimiento (Compatible con DATE)
   const calcularDiasParaVencer = (fechaVencimiento) => {
     if (!fechaVencimiento) return null
     
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
+    // Obtener fecha actual (solo fecha, sin hora) - Compatible con DATE de BD
+    const hoy = new Date().toISOString().split('T')[0] // '2025-10-29'
     
-    const fechaVenc = new Date(fechaVencimiento)
-    fechaVenc.setHours(0, 0, 0, 0)
+    // fechaVencimiento ya viene como DATE desde BD: '2025-10-30'
+    const fechaVenc = fechaVencimiento
     
-    const diffTime = fechaVenc.getTime() - hoy.getTime()
+    // Convertir ambas a Date para calcular diferencia
+    const fecha1 = new Date(hoy + 'T00:00:00')
+    const fecha2 = new Date(fechaVenc + 'T00:00:00')
+    
+    // Calcular diferencia en días
+    const diffTime = fecha2.getTime() - fecha1.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
     return diffDays

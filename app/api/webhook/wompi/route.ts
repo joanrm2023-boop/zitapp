@@ -147,9 +147,11 @@ async function handleSubscriptionCreated(subscription: any) {
       .single();
 
     if (cliente && status === 'ACTIVE') {
-      // Calcular fecha de vencimiento (1 mes desde ahora)
-      const fechaVencimiento = new Date();
-      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + 1);
+      // Calcular fecha de vencimiento (30 días desde hoy, solo fecha)
+      const hoy = new Date();
+      const fechaVencimiento = new Date(hoy);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      const fechaVencimientoFinal = fechaVencimiento.toISOString().split('T')[0]; // ✅ Solo fecha
 
       // Activar suscripción cuando se crea exitosamente
       await supabase
@@ -157,7 +159,7 @@ async function handleSubscriptionCreated(subscription: any) {
         .update({
           suscripcion_activa: true,
           estado_suscripcion: 'activa',
-          fecha_vencimiento_plan: fechaVencimiento.toISOString(),
+          fecha_vencimiento_plan: fechaVencimientoFinal, // ✅ CAMBIO AQUÍ
           activo: 'Activo',
           plan: plan_id,
           fecha_cambio_estado: new Date().toISOString()
@@ -185,16 +187,18 @@ async function handleSubscriptionPayment(subscription: any) {
         .single();
 
       if (cliente) {
-        // Calcular nueva fecha de vencimiento (1 mes desde ahora)
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setMonth(fechaVencimiento.getMonth() + 1);
+        // Calcular nueva fecha de vencimiento (30 días desde hoy, solo fecha)
+        const hoy = new Date();
+        const fechaVencimiento = new Date(hoy);
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+        const fechaVencimientoFinal = fechaVencimiento.toISOString().split('T')[0]; // ✅ Solo fecha
 
         await supabase
           .from('clientes')
           .update({
             suscripcion_activa: true,
             estado_suscripcion: 'activa',
-            fecha_vencimiento_plan: fechaVencimiento.toISOString(),
+            fecha_vencimiento_plan: fechaVencimientoFinal, // ✅ CAMBIO AQUÍ
             activo: 'Activo',
             fecha_cambio_estado: new Date().toISOString()
           })
@@ -250,27 +254,39 @@ async function activateSubscription(userId: string, planId: string, notificacion
     console.log('Estado de suscripción:', clienteInfo?.estado_suscripcion);
     console.log('Fecha de vencimiento actual del cliente:', clienteInfo?.fecha_vencimiento_plan);
 
-    let fechaVencimiento;
+    // Obtener fecha actual (solo fecha, sin hora)
+    const hoyStr = new Date().toISOString().split('T')[0]; // '2025-10-29'
+
+    let fechaVencimientoStr;
+
     if (clienteInfo?.fecha_vencimiento_plan && clienteInfo?.estado_suscripcion !== 'trial') {
-      // Solo usar renovación aditiva si NO está en trial
-      fechaVencimiento = new Date(clienteInfo.fecha_vencimiento_plan);
-      const hoy = new Date();
+      // Cliente con suscripción pagada previa
+      const fechaVencActual = clienteInfo.fecha_vencimiento_plan; // Ya es DATE: '2025-10-30'
       
-      if (fechaVencimiento < hoy) {
+      // Comparar solo fechas (sin horas)
+      if (fechaVencActual < hoyStr) {
+        // Ya venció, empezar desde hoy
         console.log('Suscripción pagada ya vencida, iniciando desde hoy');
-        fechaVencimiento = new Date();
+        fechaVencimientoStr = hoyStr;
       } else {
+        // Aún vigente, mantener fecha actual para sumar días
         console.log('Renovación de suscripción pagada, manteniendo días restantes');
+        fechaVencimientoStr = fechaVencActual;
       }
     } else {
+      // Primera compra o fin de trial, iniciar desde hoy
       console.log('Primera compra o fin de trial, iniciando desde hoy');
-      fechaVencimiento = new Date();
+      fechaVencimientoStr = hoyStr;
     }
 
+    // Agregar 30 días
+    const fechaVencimiento = new Date(fechaVencimientoStr + 'T00:00:00');
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
-    const fechaVencimientoISO = fechaVencimiento.toISOString();
 
-    console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoISO);
+    // Convertir a formato DATE (solo fecha, sin hora)
+    const fechaVencimientoFinal = fechaVencimiento.toISOString().split('T')[0]; // '2025-11-28'
+
+    console.log('Nueva fecha de vencimiento calculada:', fechaVencimientoFinal);
 
     // Actualizar el cliente para activar su suscripción
     const { error } = await supabase
@@ -278,7 +294,7 @@ async function activateSubscription(userId: string, planId: string, notificacion
       .update({
         suscripcion_activa: true,
         estado_suscripcion: 'activa',
-        fecha_vencimiento_plan: fechaVencimientoISO,
+        fecha_vencimiento_plan: fechaVencimientoFinal,
         activo: 'Activo',
         plan: planId,
         notificaciones_activas: notificacionesIncluidas,

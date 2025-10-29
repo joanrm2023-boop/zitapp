@@ -42,15 +42,24 @@ export default function DashboardCliente() {
   const calcularDiasParaVencer = (fechaVencimiento) => {
     if (!fechaVencimiento) return null
     
-    // Usar solo fechas sin horas para evitar problemas de zona horaria
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0) // Resetear a medianoche
+    // Obtener fecha actual (solo fecha, sin hora) - Compatible con DATE de BD
+    const hoy = new Date().toISOString().split('T')[0] // '2025-10-29'
     
-    const fechaVenc = new Date(fechaVencimiento)
-    fechaVenc.setHours(0, 0, 0, 0) // Resetear a medianoche
+    // fechaVencimiento ya viene como DATE desde BD: '2025-10-30'
+    const fechaVenc = fechaVencimiento
     
-    const diffTime = fechaVenc.getTime() - hoy.getTime()
+    // Convertir ambas a Date para calcular diferencia
+    const fecha1 = new Date(hoy + 'T00:00:00')
+    const fecha2 = new Date(fechaVenc + 'T00:00:00')
+    
+    // Calcular diferencia en días
+    const diffTime = fecha2.getTime() - fecha1.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    console.log('📅 DEBUG DÍAS PARA VENCER:')
+    console.log('Hoy:', hoy)
+    console.log('Vence:', fechaVenc)
+    console.log('Días restantes:', diffDays)
     
     return diffDays
   }
@@ -84,7 +93,7 @@ export default function DashboardCliente() {
         setDiasParaVencer(dias)
         
         // Mostrar banner si faltan 5 días o menos (y no está vencido)
-        if (dias !== null && dias <= 5 && dias > 0) {
+        if (dias !== null && dias <= 5) {
           setMostrarBanner(true)
         }
 
@@ -200,16 +209,19 @@ export default function DashboardCliente() {
 
   // Función para obtener el color del banner según los días restantes
   const obtenerColorBanner = (dias) => {
-    if (dias <= 1) return 'bg-red-500 border-red-600'
-    if (dias <= 3) return 'bg-orange-500 border-orange-600' 
-    return 'bg-yellow-500 border-yellow-600'
+    if (dias < 0) return 'bg-red-700 border-red-800' // Ya venció (más oscuro)
+    if (dias === 0) return 'bg-red-600 border-red-700' // Vence HOY
+    if (dias === 1) return 'bg-red-500 border-red-600' // Vence MAÑANA
+    if (dias <= 3) return 'bg-orange-500 border-orange-600' // 2-3 días
+    return 'bg-yellow-500 border-yellow-600' // 4-5 días
   }
 
   // Función para obtener el mensaje del banner
   const obtenerMensajeBanner = (dias) => {
-    if (dias <= 0) return 'Tu suscripción ha vencido'
-    if (dias === 1) return 'Tu suscripción vence mañana'
-    return `Tu suscripción vence en ${dias} días`
+    if (dias < 0) return `🔴 Tu suscripción venció hace ${Math.abs(dias)} días`
+    if (dias === 0) return '🔴 Tu suscripción vence HOY'
+    if (dias === 1) return '⚠️ Tu suscripción vence MAÑANA'
+    return `⚠️ Tu suscripción vence en ${dias} días`
   }
 
   if (!mounted) return null
@@ -256,7 +268,7 @@ export default function DashboardCliente() {
       </div>
 
       {/* Banner de advertencia de vencimiento */}
-      {mostrarBanner && !bannerCerrado && diasParaVencer !== null && diasParaVencer <= 5 && diasParaVencer > 0 && (
+      {mostrarBanner && !bannerCerrado && diasParaVencer !== null && diasParaVencer <= 5 && (
         <motion.div
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -271,16 +283,23 @@ export default function DashboardCliente() {
           <div className="relative flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex-shrink-0">
-                <AlertTriangle className="w-8 h-8 animate-pulse" />
-              </div>
-              <div className="flex-grow">
-                <h3 className="text-lg font-bold mb-1">
-                  ⚠️ {obtenerMensajeBanner(diasParaVencer)}
-                </h3>
-                <p className="text-white/90 text-sm">
-                  Renueva ahora para continuar disfrutando de todos los beneficios de Zitapp
-                </p>
-              </div>
+                  {diasParaVencer < 0 || diasParaVencer === 0 ? (
+                    <X className="w-8 h-8 animate-bounce" />
+                  ) : (
+                    <AlertTriangle className="w-8 h-8 animate-pulse" />
+                  )}
+                </div>
+                <div className="flex-grow">
+                  <h3 className="text-lg font-bold mb-1">
+                    {obtenerMensajeBanner(diasParaVencer)}
+                  </h3>
+                  <p className="text-white/90 text-sm">
+                    {diasParaVencer <= 0 
+                      ? 'Renueva AHORA para recuperar el acceso completo a Zitapp' 
+                      : 'Renueva ahora para continuar disfrutando de todos los beneficios de Zitapp'
+                    }
+                  </p>
+                </div>
             </div>
             
             <div className="flex items-center space-x-3">
@@ -292,22 +311,23 @@ export default function DashboardCliente() {
                   console.log('cliente?.user_id:', cliente?.user_id);
                   
                   const renovacionData = {
-                    email: cliente?.correo || '',
-                    nombre: cliente?.nombre || '', // ← AGREGAR ESTA LÍNEA
-                    planId: 'pendiente',
-                    userId: cliente?.user_id || '',
-                    esRenovacion: true
-                  }
-                  
-                  console.log('renovacionData que se guarda:', renovacionData);
-                  localStorage.setItem('renovacionData', JSON.stringify(renovacionData))
-                  router.push('/planes')
-                }}
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2 border border-white/30"
-              >
-                <span>Renovar Plan</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                      email: cliente?.correo || '',
+                      nombre: cliente?.nombre || '',
+                      planId: 'pendiente',
+                      userId: cliente?.user_id || '',
+                      esRenovacion: true
+                    }
+                    localStorage.setItem('renovacionData', JSON.stringify(renovacionData))
+                    router.push('/planes')
+                  }}
+                  className={`${diasParaVencer <= 0 
+                    ? 'bg-white text-red-600 font-bold animate-pulse' 
+                    : 'bg-white/20 hover:bg-white/30 text-white'
+                  } backdrop-blur-sm px-6 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2 border border-white/30`}
+                >
+                  <span>{diasParaVencer <= 0 ? '🔥 RENOVAR AHORA' : 'Renovar Plan'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               
               <button
                 onClick={() => setBannerCerrado(true)}
