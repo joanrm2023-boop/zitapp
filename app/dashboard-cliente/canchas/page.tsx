@@ -24,6 +24,8 @@ export default function CanchasPage() {
   const [subiendoImagen, setSubiendoImagen] = useState(false);
   const [editImagenUrl, setEditImagenUrl] = useState('');
   const [editImagenFile, setEditImagenFile] = useState<File | null>(null);
+  const [precio, setPrecio] = useState('');
+  const [editPrecio, setEditPrecio] = useState('');
  
 
   useEffect(() => setMounted(true), []);
@@ -98,16 +100,34 @@ export default function CanchasPage() {
     return true;
   };
 
+  const validarPrecio = (valor: string) => {
+    if (!valor.trim()) {
+      setMensajeError('El precio es obligatorio.');
+      return false;
+    }
+    const precioNum = parseFloat(valor);
+    if (isNaN(precioNum) || precioNum <= 0) {
+      setMensajeError('El precio debe ser un número mayor a 0.');
+      return false;
+    }
+    if (precioNum > 10000000) {
+      setMensajeError('El precio no puede exceder $10,000,000.');
+      return false;
+    }
+    setMensajeError('');
+    return true;
+  };
+
   const handleAgregar = async () => {
     // Validación de campos vacíos
-    if (!nombre.trim() || !descripcion.trim()) {
+    if (!nombre.trim() || !descripcion.trim() || !precio.trim()) {
       setErrorCamposVisible(true);
       setTimeout(() => setErrorCamposVisible(false), 3000);
       return;
     }
 
     // Usar funciones de validación
-    if (!validarNombre(nombre) || !validarDescripcion(descripcion)) {
+    if (!validarNombre(nombre) || !validarDescripcion(descripcion) || !validarPrecio(precio)) {
       setTimeout(() => setMensajeError(''), 3000);
       return;
     }
@@ -169,15 +189,16 @@ export default function CanchasPage() {
     }
 
     const { data, error } = await supabase
-      .from('canchas')
-      .insert([{
-        nombre_cancha: nombre.trim(),
-        descripcion_cancha: descripcion.trim(),
-        imagen_url: imagenUrl,
-        activo: true,
-        id_cliente: idCliente
-      }])
-      .select();
+    .from('canchas')
+    .insert([{
+      nombre_cancha: nombre.trim(),
+      descripcion_cancha: descripcion.trim(),
+      imagen_url: imagenUrl,
+      precio_hora: parseFloat(precio), // ✅ NUEVO
+      activo: true,
+      id_cliente: idCliente
+    }])
+    .select();
 
     setSubiendoImagen(false);
 
@@ -189,6 +210,7 @@ export default function CanchasPage() {
       setCanchas((prev) => [...prev, ...data]);
       setNombre('');
       setDescripcion('');
+      setPrecio('');  
       setImagenFile(null);
       // Limpiar el input de archivo
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -203,6 +225,7 @@ export default function CanchasPage() {
     setEditandoId(cancha.id_cancha);
     setEditNombre(cancha.nombre_cancha);
     setEditDescripcion(cancha.descripcion_cancha || '');
+    setEditPrecio(cancha.precio_hora?.toString() || '');  
     setEditImagenUrl(cancha.imagen_url || '');
     setEditImagenFile(null);
   };
@@ -211,20 +234,21 @@ export default function CanchasPage() {
     setEditandoId(null);
     setEditNombre('');
     setEditDescripcion('');
+    setEditPrecio(''); // ✅ NUEVO
     setEditImagenUrl('');
     setEditImagenFile(null);
   };
 
   const guardarEdicion = async () => {
     // Validación de campos vacíos
-    if (!editandoId || !editNombre.trim() || !editDescripcion.trim()) {
+    if (!editandoId || !editNombre.trim() || !editDescripcion.trim() || !editPrecio.trim()) {
       setErrorCamposVisible(true);
       setTimeout(() => setErrorCamposVisible(false), 3000);
       return;
     }
 
     // Usar funciones de validación
-    if (!validarNombre(editNombre) || !validarDescripcion(editDescripcion)) {
+    if (!validarNombre(editNombre) || !validarDescripcion(editDescripcion) || !validarPrecio(editPrecio)) {
       setTimeout(() => setMensajeError(''), 3000);
       return;
     }
@@ -285,6 +309,7 @@ export default function CanchasPage() {
       .update({
         nombre_cancha: editNombre.trim(),
         descripcion_cancha: editDescripcion.trim(),
+        precio_hora: parseFloat(editPrecio), // ✅ NUEVO
         imagen_url: nuevaImagenUrl,
       })
       .eq('id_cancha', editandoId)
@@ -446,21 +471,23 @@ export default function CanchasPage() {
               )}
             </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700">Descripción:</label>
+            <label className="text-sm font-medium text-gray-700">Precio por hora:</label>
             <div className="relative">
-              <FileText className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" size={18} />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 font-semibold z-10">$</span>
               <input
-                type="text"
-                value={descripcion}
+                type="number"
+                value={precio}
                 onChange={(e) => {
-                  setDescripcion(e.target.value);
-                  if (e.target.value.trim()) validarDescripcion(e.target.value);
+                  setPrecio(e.target.value);
+                  if (e.target.value.trim()) validarPrecio(e.target.value);
                 }}
-                placeholder="Ej: Primer piso, cancha techada"
-                className="pl-8 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white"
+                placeholder="Ej: 50000"
+                min="0"
+                step="1000"
+                className="pl-6 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white"
               />
             </div>
-            <p className="text-xs text-gray-500">{descripcion.length}/200 caracteres</p>
+            <p className="text-xs text-gray-500">Precio que se cobrará por hora de uso</p>
           </div>
         </div>
 
@@ -542,6 +569,22 @@ export default function CanchasPage() {
                       />
                       <p className="text-xs text-gray-500">{editDescripcion.length}/200 caracteres</p>
                     </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium text-gray-700">Precio por hora:</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
+                        <input
+                          type="number"
+                          value={editPrecio}
+                          onChange={(e) => setEditPrecio(e.target.value)}
+                          placeholder="Precio por hora"
+                          min="0"
+                          step="1000"
+                          className="pl-6 p-2 border border-gray-300 rounded-md text-gray-800 w-full"
+                        />
+                      </div>
+                    </div>
+
                     <div className="flex flex-col gap-2 md:col-span-2">
                       <label className="text-sm font-medium text-gray-700">Cambiar imagen de la cancha:</label>
                       
@@ -619,9 +662,9 @@ export default function CanchasPage() {
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-800 text-lg">{c.nombre_cancha}</h3>
-                        <div className="flex items-start gap-1 text-gray-600 text-sm mt-1">
-                          <FileText size={14} className="mt-0.5 flex-shrink-0" />
-                          <span className="break-words">{c.descripcion_cancha || 'Sin descripción'}</span>
+                        <div className="flex items-center gap-1 text-green-600 text-sm mt-2 font-semibold">
+                          <span>💰</span>
+                          <span>${c.precio_hora?.toLocaleString('es-CO') || '0'} / hora</span>
                         </div>
                         <span className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${
                           c.activo 
