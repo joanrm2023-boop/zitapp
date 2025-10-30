@@ -470,6 +470,26 @@ export default function CanchasPage() {
                 <p className="text-xs text-green-600">✅ Imagen seleccionada: {imagenFile.name}</p>
               )}
             </div>
+
+            
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-700">Descripción:</label>
+            <div className="relative">
+              <FileText className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" size={18} />
+              <input
+                type="text"
+                value={descripcion}
+                onChange={(e) => {
+                  setDescripcion(e.target.value);
+                  if (e.target.value.trim()) validarDescripcion(e.target.value);
+                }}
+                placeholder="Ej: Primer piso, cancha techada"
+                className="pl-8 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white"
+              />
+            </div>
+            <p className="text-xs text-gray-500">{descripcion.length}/200 caracteres</p>
+          </div>
+
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-700">Precio por hora:</label>
             <div className="relative">
