@@ -46,6 +46,11 @@ export default function ReservarCancha() {
 
   const [usuarioInteractuo, setUsuarioInteractuo] = useState(false);
   const [imagenAmpliada, setImagenAmpliada] = useState<string | null>(null);
+  const [porcentajeComision, setPorcentajeComision] = useState<number>(15);
+  const [precioHora, setPrecioHora] = useState<number>(0);
+  const [montoAnticipo, setMontoAnticipo] = useState<number>(0);
+  const [montoPendiente, setMontoPendiente] = useState<number>(0);
+
 
   const lanzarToast = (mensaje: string) => {
     setTextoToast(mensaje);
@@ -149,6 +154,57 @@ export default function ReservarCancha() {
 
     obtenerCanchas();
   }, [cliente]);
+
+  // Cargar porcentaje de comisión del dueño
+  useEffect(() => {
+    const cargarPorcentajeComision = async () => {
+      if (!cliente?.id_cliente) return;
+
+      const { data, error } = await supabase
+        .from('datos_pago_clientes')
+        .select('porcentaje_comision')
+        .eq('id_cliente', cliente.id_cliente)
+        .single();
+
+      if (!error && data) {
+        console.log('💰 Porcentaje de comisión cargado:', data.porcentaje_comision);
+        setPorcentajeComision(data.porcentaje_comision);
+      } else {
+        console.log('⚠️ No se encontró porcentaje, usando default 15%');
+        setPorcentajeComision(15);
+      }
+    };
+
+    cargarPorcentajeComision();
+  }, [cliente]);
+
+  // Calcular anticipo y monto pendiente cuando cambie la cancha
+  useEffect(() => {
+    if (!canchaSeleccionada) {
+      setPrecioHora(0);
+      setMontoAnticipo(0);
+      setMontoPendiente(0);
+      return;
+    }
+
+    const canchaData = canchas.find((c: any) => c.id_cancha === canchaSeleccionada);
+    if (canchaData && canchaData.precio_hora) {
+      const precio = Number(canchaData.precio_hora);
+      const anticipo = (precio * porcentajeComision) / 100;
+      const pendiente = precio - anticipo;
+
+      console.log('💵 Cálculos:', {
+        precio_hora: precio,
+        porcentaje: porcentajeComision,
+        anticipo,
+        pendiente
+      });
+
+      setPrecioHora(precio);
+      setMontoAnticipo(anticipo);
+      setMontoPendiente(pendiente);
+    }
+  }, [canchaSeleccionada, canchas, porcentajeComision]);
 
   // Cargar días bloqueados específicos
   useEffect(() => {
@@ -839,11 +895,11 @@ export default function ReservarCancha() {
             </div>
           </div>
 
-          {/* Mostrar imagen y descripción de cancha */}
+          {/* Mostrar imagen, descripción y precios de cancha */}
             {canchaSeleccionada && (() => {
               const canchaData = canchas.find((c: any) => c.id_cancha === canchaSeleccionada);
               return (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
                   {canchaData?.imagen_url && (
                     <div className="mb-3">
                       <img 
@@ -858,10 +914,45 @@ export default function ReservarCancha() {
                       </p>
                     </div>
                   )}
-                  <p className="text-sm text-blue-800">
-                    <span className="font-medium">📍 Descripción:</span>{' '}
-                    {canchaData?.descripcion_cancha || 'Sin descripción disponible'}
-                  </p>
+                  
+                  {/* Descripción */}
+                  <div className="p-3 bg-white rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <span className="font-medium">📍 Descripción:</span>{' '}
+                      {canchaData?.descripcion_cancha || 'Sin descripción disponible'}
+                    </p>
+                  </div>
+
+                  {/* Información de precios */}
+                  <div className="p-3 bg-white rounded-lg border border-blue-200 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">💵 Precio por hora:</span>
+                      <span className="text-lg font-bold text-green-600">
+                        ${precioHora.toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                    
+                    <div className="border-t border-gray-200 pt-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-gray-600">Anticipo a pagar ({porcentajeComision}%):</span>
+                        <span className="text-sm font-semibold text-orange-600">
+                          ${montoAnticipo.toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">Pendiente en sitio:</span>
+                        <span className="text-sm font-medium text-gray-700">
+                          ${montoPendiente.toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                      <p className="text-xs text-yellow-800 text-center">
+                        💡 Pagas el anticipo ahora, el resto lo pagas cuando llegues
+                      </p>
+                    </div>
+                  </div>
                 </div>
               );
             })()}
