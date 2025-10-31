@@ -26,9 +26,49 @@ export default function CanchasPage() {
   const [editImagenFile, setEditImagenFile] = useState<File | null>(null);
   const [precio, setPrecio] = useState('');
   const [editPrecio, setEditPrecio] = useState('');
+  const [porcentajeComision, setPorcentajeComision] = useState<number>(15);
+  const [editandoComision, setEditandoComision] = useState(false);
+  const [tempPorcentaje, setTempPorcentaje] = useState<string>('15');
+  const [idDatosPago, setIdDatosPago] = useState<string | null>(null);
  
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const cargarPorcentajeComision = async () => {
+      if (!idCliente) return;
+
+      const { data, error } = await supabase
+        .from('datos_pago_clientes')
+        .select('id, porcentaje_comision')
+        .eq('id_cliente', idCliente)
+        .single();
+
+      if (error || !data) {
+        // No existe, crear uno nuevo con 15% por defecto
+        const { data: nuevoRegistro, error: errorInsert } = await supabase
+          .from('datos_pago_clientes')
+          .insert([{ 
+            id_cliente: idCliente, 
+            porcentaje_comision: 15.00 
+          }])
+          .select('id, porcentaje_comision')
+          .single();
+
+        if (!errorInsert && nuevoRegistro) {
+          setPorcentajeComision(nuevoRegistro.porcentaje_comision);
+          setIdDatosPago(nuevoRegistro.id);
+        }
+      } else {
+        setPorcentajeComision(data.porcentaje_comision);
+        setIdDatosPago(data.id);
+      }
+    };
+
+    if (idCliente) {
+      cargarPorcentajeComision();
+    }
+  }, [idCliente]);
 
   useEffect(() => {
     const cargarCanchas = async () => {
@@ -347,6 +387,54 @@ export default function CanchasPage() {
     }
   };
 
+  const validarPorcentaje = (valor: string) => {
+    const num = parseFloat(valor);
+    if (isNaN(num)) {
+      setMensajeError('El porcentaje debe ser un número válido');
+      return false;
+    }
+    if (num < 15 || num > 50) {
+      setMensajeError('El porcentaje debe estar entre 15% y 50%');
+      return false;
+    }
+    setMensajeError('');
+    return true;
+  };
+
+  const guardarPorcentaje = async () => {
+    if (!validarPorcentaje(tempPorcentaje)) {
+      setTimeout(() => setMensajeError(''), 3000);
+      return;
+    }
+
+    if (!idDatosPago) {
+      setMensajeError('Error: No se encontró el registro de datos de pago');
+      setTimeout(() => setMensajeError(''), 3000);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('datos_pago_clientes')
+      .update({ porcentaje_comision: parseFloat(tempPorcentaje) })
+      .eq('id', idDatosPago);
+
+    if (error) {
+      setMensajeError('Error al guardar el porcentaje');
+      setTimeout(() => setMensajeError(''), 3000);
+    } else {
+      setPorcentajeComision(parseFloat(tempPorcentaje));
+      setEditandoComision(false);
+      setMensajeVisible(true);
+      setTimeout(() => setMensajeVisible(false), 3000);
+    }
+  };
+
+  const cancelarEdicionComision = () => {
+    setTempPorcentaje(porcentajeComision.toString());
+    setEditandoComision(false);
+    setMensajeError('');
+  };
+
   if (!mounted) return null;
 
   return (
@@ -392,6 +480,75 @@ export default function CanchasPage() {
           </div>
         </div>
       </div>
+
+      {/* Tarjeta de Configuración de Comisión */}
+        <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-3 rounded-full">
+              <span className="text-white text-xl">💰</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Configuración de Comisión</h2>
+              <p className="text-sm text-gray-600">Porcentaje que pagas por cada reserva</p>
+            </div>
+          </div>
+
+          {editandoComision ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Porcentaje de comisión (15% - 50%):
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={tempPorcentaje}
+                    onChange={(e) => setTempPorcentaje(e.target.value)}
+                    min="15"
+                    max="50"
+                    step="0.5"
+                    className="pl-3 pr-8 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-white"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">%</span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Este porcentaje se aplicará a todas tus canchas
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={guardarPorcentaje}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={cancelarEdicionComision}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-600">Comisión actual:</p>
+                <p className="text-3xl font-bold text-orange-600">{porcentajeComision}%</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditandoComision(true);
+                  setTempPorcentaje(porcentajeComision.toString());
+                }}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md transition-colors"
+              >
+                <Pencil size={18} />
+                Editar
+              </button>
+            </div>
+          )}
+        </div>
 
       {/* Mensajes */}
       <AnimatePresence>
