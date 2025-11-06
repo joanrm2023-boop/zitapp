@@ -553,6 +553,7 @@ export default function ReservarCancha() {
     setMensaje('');
     setEsError(false);
 
+    // Validar campos vacíos
     const camposVacios = [];
     if (!nombre.trim()) camposVacios.push('Nombre');
     if (!correo.trim()) camposVacios.push('Correo');
@@ -568,6 +569,7 @@ export default function ReservarCancha() {
       return;
     }
 
+    // Validar errores del formulario
     if (errorNombre || errorCorreo || errorIdentificacion || errorTelefono || errorFecha || errorIdentificacionDuplicada) {
       if (errorIdentificacionDuplicada) {
         setMensaje(errorIdentificacionDuplicada);
@@ -579,125 +581,48 @@ export default function ReservarCancha() {
     }
 
     try {
-      const fechaHoy = new Date().toISOString().split('T')[0];
-
-      const { data: reservasPendientes, error: errorPendiente } = await supabase
-        .from('reservas_cancha')
-        .select('id, fecha, hora')
-        .eq('identificacion', identificacion)
-        .eq('id_cliente', cliente.id_cliente)
-        .gte('fecha', fechaHoy);
-
-      if (errorPendiente) {
-        setMensaje('❌ Error validando reservas pendientes.');
-        setEsError(true);
-        return;
-      }
-
-      if (reservasPendientes && reservasPendientes.length > 0) {
-        const reserva = reservasPendientes[0];
-        setMensaje(`❌ Ya tienes una reserva pendiente para el ${reserva.fecha} a las ${reserva.hora}. No puedes agendar otra hasta cumplirla.`);
-        setEsError(true);
-        return;
-      }
-
-      const { data: reservasExistentes } = await supabase
-        .from('reservas_cancha')
-        .select('id')
-        .eq('id_cancha', canchaSeleccionada)
-        .eq('fecha', fecha)
-        .eq('hora', horaSeleccionada);
-
-      if (reservasExistentes && reservasExistentes.length > 0) {
-        setMensaje('❌ Esta hora ya está reservada para esta cancha.');
-        setEsError(true);
-        return;
-      }
-
-      const { error } = await supabase.from('reservas_cancha').insert({
-        nombre,
-        correo,
-        identificacion,
-        telefono,
-        fecha,
-        hora: horaSeleccionada,
-        id_cancha: canchaSeleccionada,
-        id_cliente: cliente.id_cliente,
+      // 🆕 NUEVO FLUJO: Llamar API para crear pago
+      setMensaje('⏳ Preparando pago...');
+      
+      const response = await fetch('/api/create-payment-cancha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cancha_id: canchaSeleccionada,
+          cliente_id: cliente.id_cliente,
+          fecha_reserva: fecha,
+          hora_inicio: horaSeleccionada,
+          hora_fin: horaSeleccionada, // Puedes ajustar esto si tienes hora de fin
+          nombre_cliente: nombre,
+          telefono_cliente: telefono,
+          email_cliente: correo,
+          precio_hora: precioHora,
+          porcentaje_anticipo: porcentajeComision,
+          monto_anticipo: montoAnticipo,
+          monto_pendiente: montoPendiente
+        }),
       });
 
-      if (error) {
-        console.error('❌ Error insertando reserva:', error.message);
-        setMensaje(`❌ Error al guardar la reserva: ${error.message}`);
-        setEsError(true);
-      } else {
-        const canchaSeleccionadaData = canchas.find((c: any) => c.id_cancha === canchaSeleccionada);
-        
-        // 🆕 NUEVO: Enviar email de confirmación
-        try {
-          console.log('🔵 Enviando email de confirmación...');
-          const emailResponse = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              tipo: 'confirmacion_cancha',
-              reserva: {
-                nombre,
-                correo,
-                fecha,
-                hora: horaSeleccionada,
-                cancha_nombre: canchaSeleccionadaData?.nombre_cancha || 'Por asignar'
-              },
-              cliente: {
-                id_cliente: cliente.id_cliente,
-                nombre: cliente.nombre,
-                direccion: cliente.direccion || null
-              }
-            }),
-          });
+      const result = await response.json();
 
-          const emailResult = await emailResponse.json();
-          
-          if (emailResult.success) {
-            console.log('✅ Email de confirmación enviado:', emailResult.messageId);
-          } else if (emailResult.notificacionesActivas === false) {
-            console.log('ℹ️ Cliente no tiene notificaciones activas:', emailResult.message);
-          } else {
-            console.error('⚠️ Error enviando email:', emailResult.error || emailResult.message);
-          }
-        } catch (emailError) {
-          console.error('⚠️ Error en envío de email:', emailError);
-        }
-
-        setDatosReserva({
-          nombre,
-          fecha,
-          hora: horaSeleccionada,
-          cancha: canchaSeleccionadaData?.nombre_cancha || 'N/A',
-          cliente: cliente.nombre
-        });
-        
-        setMostrarModalExito(true);
-        
-        setTimeout(() => {
-          setMostrarModalExito(false);
-          setDatosReserva(null);
-          setUsuarioInteractuo(false);
-        }, 10000);
-        
-        setNombre('');
-        setCorreo('');
-        setIdentificacion('');
-        setTelefono('');
-        setHoraSeleccionada('');
-        setCanchaSeleccionada('');
-        setFecha('');
-        setErrorIdentificacionDuplicada('');
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al crear pago');
       }
-    } catch (err) {
-      console.error('❌ Error en submit:', err);
-      setMensaje('❌ Error inesperado al procesar la reserva.');
+
+      console.log('✅ Payment Link creado:', result);
+
+      // 🔗 Redirigir a Wompi
+      if (result.payment_link) {
+        window.location.href = result.payment_link;
+      } else {
+        throw new Error('No se recibió link de pago');
+      }
+
+    } catch (error) {
+      console.error('❌ Error procesando pago:', error);
+      setMensaje(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       setEsError(true);
     }
   };
@@ -999,7 +924,7 @@ export default function ReservarCancha() {
                 : 'bg-green-600 hover:bg-green-700 text-white'
             }`}
           >
-            Reservar cancha
+            🔒 Proceder al pago
           </motion.button>
 
           {/* Mostrar ayudas y errores solo si el usuario ha interactuado */}

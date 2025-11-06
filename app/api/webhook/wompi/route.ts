@@ -21,7 +21,13 @@ export async function POST(request: NextRequest) {
     // Procesar diferentes tipos de eventos
     switch (event.event) {
       case 'transaction.updated':
-        await handleTransactionUpdate(event.data);
+        // 🔀 Detectar tipo por reference
+        const reference = event.data?.reference || '';
+        if (reference.startsWith('cancha_')) {
+          await handleCanchaTransaction(event);
+        } else {
+          await handleTransactionUpdate(event.data);
+        }
         break;
       
       case 'subscription.created':
@@ -134,6 +140,70 @@ async function handleTransactionUpdate(transaction: any) {
     console.error('Error handling transaction update:', error);
   }
 }
+
+// 🏟️ Procesar transacción de RESERVA DE CANCHA
+  async function handleCanchaTransaction(event: any) {
+    try {
+      console.log('🏟️ Procesando transacción de CANCHA:', event.data.reference);
+      
+      const reference = event.data.reference;
+      const status = event.data.status;
+      const transactionId = event.data.id;
+
+      const { data: transaccion, error: fetchError } = await supabase
+        .from('transacciones_canchas')
+        .select('*, reservas_cancha(*)')
+        .eq('referencia_pago', reference)
+        .single();
+
+      if (fetchError || !transaccion) {
+        console.error('❌ Transacción no encontrada:', reference);
+        return;
+      }
+
+      if (status === 'APPROVED') {
+        const montoAnticipo = transaccion.monto_anticipo;
+        const comisionPorcentaje = transaccion.comision_plataforma;
+        const comisionPlataforma = (montoAnticipo * comisionPorcentaje) / 100;
+        const montoParaDueno = montoAnticipo - comisionPlataforma;
+
+        await supabase
+          .from('transacciones_canchas')
+          .update({
+            estado: 'aprobado',
+            wompi_transaction_id: transactionId,
+            fecha_aprobacion: new Date().toISOString(),
+            comision_monto: comisionPlataforma,
+            monto_para_dueno: montoParaDueno
+          })
+          .eq('id', transaccion.id);
+
+        await supabase
+          .from('reservas_cancha')
+          .update({
+            estado_pago: 'anticipo_pagado',
+            estado: 'confirmada'
+          })
+          .eq('id', transaccion.reserva_id);
+
+        await supabase
+          .from('pagos_a_duenos')
+          .insert({
+            cliente_id: transaccion.cliente_id,
+            transaccion_id: transaccion.id,
+            monto_total: transaccion.monto_total,
+            comision_plataforma: comisionPlataforma,
+            monto_a_pagar: montoParaDueno,
+            estado: 'pendiente',
+            fecha_generacion: new Date().toISOString()
+          });
+
+        console.log(`✅ RESERVA CONFIRMADA: ${transaccion.reserva_id}`);
+      }
+    } catch (error) {
+      console.error('Error handling cancha transaction:', error);
+    }
+  }
 
 async function handleSubscriptionCreated(subscription: any) {
   try {
