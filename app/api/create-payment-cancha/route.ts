@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabaseClient';
 // PRUEBAS (comentar en producción):
 const WOMPI_PUBLIC_KEY = 'pub_test_xHSVWM0rB3WZk5kMKZoKIyo5ZUP51zvT';
 const WOMPI_PRIVATE_KEY = 'prv_test_eFdW2YMHDJsFm1SZm9EAPu9qnbXyYuv3';
-const WOMPI_EVENTS_SECRET = 'https://ready-groups-kneel.loca.lt/api/webhook/wompi';
+const WOMPI_EVENTS_SECRET = 'test_events_secret_123';
 
 interface ReservaData {
   cancha_id: string;
