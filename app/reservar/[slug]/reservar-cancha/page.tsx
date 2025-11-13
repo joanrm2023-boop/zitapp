@@ -82,7 +82,7 @@ export default function ReservarCancha() {
       const { data: reservasPendientes, error: errorPendiente } = await supabase
         .from('reservas_cancha')
         .select('id, fecha, hora')
-        .eq('identificacion', identificacionValue)
+        .eq('identificacion', identificacionValue.trim())
         .eq('id_cliente', cliente.id_cliente)
         .gte('fecha', fechaHoy);
 
@@ -563,6 +563,17 @@ export default function ReservarCancha() {
     if (!horaSeleccionada) camposVacios.push('Hora');
     if (!canchaSeleccionada) camposVacios.push('Cancha');
 
+    // 🔍 AGREGAR ESTO AQUÍ ⬇️
+    console.log('🔍 Valores de los campos:', {
+      nombre,
+      correo,
+      identificacion,
+      telefono,
+      fecha,
+      horaSeleccionada,
+      canchaSeleccionada
+    });
+
     if (camposVacios.length > 0) {
       setMensaje(`❌ Faltan: ${camposVacios.join(', ')}`);
       setEsError(true);
@@ -594,8 +605,9 @@ export default function ReservarCancha() {
           cliente_id: cliente.id_cliente,
           fecha_reserva: fecha,
           hora_inicio: horaSeleccionada,
-          hora_fin: horaSeleccionada, // Puedes ajustar esto si tienes hora de fin
+          hora_fin: horaSeleccionada,
           nombre_cliente: nombre,
+          identificacion_cliente: identificacion,  // ← AGREGAR
           telefono_cliente: telefono,
           email_cliente: correo,
           precio_hora: precioHora,
