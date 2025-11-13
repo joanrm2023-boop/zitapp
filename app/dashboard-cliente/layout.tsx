@@ -145,7 +145,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           )}
 
           <Link
-            href="/dashboard-cliente/reservas"
+            href={tipoNegocio === 'cancha' ? '/dashboard-cliente/reservas-canchas' : '/dashboard-cliente/reservas'}
             className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg p-3 transition-all duration-200 group"
           >
             <Calendar size={20} className="group-hover:scale-110 transition-transform" />
@@ -268,7 +268,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
                 )}
 
                 <Link
-                  href="/dashboard-cliente/reservas"
+                  href={tipoNegocio === 'cancha' ? '/dashboard-cliente/reservas-canchas' : '/dashboard-cliente/reservas'}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg p-4 transition-all duration-200"
                 >

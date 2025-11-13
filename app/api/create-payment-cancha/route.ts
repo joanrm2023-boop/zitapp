@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         correo: email_cliente,
         telefono: telefono_cliente,
         nota: `Reserva de ${hora_inicio} a ${hora_fin}`,
-        estado_pago: 'pendiente'
+        estado_pago: 'procesando'
       })
       .select()
       .single();
