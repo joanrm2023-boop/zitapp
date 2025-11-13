@@ -590,7 +590,7 @@ export default function ReservarCancha() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          cancha_id: canchaSeleccionada,
+          id_cancha: canchaSeleccionada,
           cliente_id: cliente.id_cliente,
           fecha_reserva: fecha,
           hora_inicio: horaSeleccionada,
