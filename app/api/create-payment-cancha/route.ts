@@ -19,6 +19,7 @@ interface ReservaData {
   hora_inicio: string;
   hora_fin: string;
   nombre_cliente: string;
+  identificacion_cliente: string;
   telefono_cliente: string;
   email_cliente: string;
   precio_hora: number;
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
       hora_inicio,
       hora_fin,
       nombre_cliente,
+      identificacion_cliente,
       telefono_cliente,
       email_cliente,
       precio_hora,
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         fecha: fecha_reserva,
         hora: hora_inicio,  // Solo guardamos hora_inicio
         nombre: nombre_cliente,
-        identificacion: '', // ⚠️ REQUERIDO - necesitas agregarlo
+        identificacion: identificacion_cliente, // ⚠️ REQUERIDO - necesitas agregarlo
         correo: email_cliente,
         telefono: telefono_cliente,
         nota: `Reserva de ${hora_inicio} a ${hora_fin}`,
@@ -144,7 +146,8 @@ export async function POST(request: NextRequest) {
 
     console.log('📤 Creando Payment Link en Wompi:', wompiData);
 
-    const wompiResponse = await fetch('https://production.wompi.co/v1/payment_links', {
+    const wompiResponse = await fetch('https://sandbox.wompi.co/v1/payment_links', {
+
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${WOMPI_PRIVATE_KEY}`,
@@ -219,7 +222,7 @@ export async function GET(request: NextRequest) {
         *,
         reservas_cancha (*)
       `)
-      .eq('referencia_pago', reference)
+      .eq('referencia_wompi', reference)
       .single();
 
     if (error || !transaccion) {
