@@ -2,13 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
-// 🔑 Claves Wompi
-// PRODUCCIÓN (descomentar cuando estés listo):
-// const WOMPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY!;
-// const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY!;
-// const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET!;
-
-// PRUEBAS (comentar en producción):
+// 🔑 Claves Wompi para Canchas (Pruebas)
 const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY_CANCHA!;
 const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY_CANCHA!;
 const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET_CANCHA!;
@@ -31,8 +25,6 @@ interface ReservaData {
 
 export async function POST(request: NextRequest) {
   try {
-    
-    
     // 1️⃣ Obtener datos de la reserva
     const reservaData: ReservaData = await request.json();
     
@@ -56,16 +48,59 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const reference = `cancha_${id_cancha}_${timestamp}`;
 
-    // 3️⃣ Crear registro en reservas_cancha (estado pendiente)
+    // 🔍 VALIDAR Y LOGGEAR DATOS RECIBIDOS
+    console.log('📥 Datos recibidos del frontend:', {
+      id_cancha,
+      cliente_id,
+      fecha_reserva,
+      hora_inicio,
+      hora_fin,
+      nombre_cliente,
+      identificacion_cliente: identificacion_cliente || '⚠️ VACÍO/UNDEFINED',
+      telefono_cliente,
+      email_cliente,
+      precio_hora,
+      monto_anticipo,
+      monto_pendiente
+    });
+
+    // Validar campos críticos
+    if (!identificacion_cliente || identificacion_cliente.trim() === '') {
+      console.error('❌ ERROR: Identificación vacía o undefined');
+      return NextResponse.json(
+        { error: 'La identificación del cliente es requerida' },
+        { status: 400 }
+      );
+    }
+
+    if (!nombre_cliente || nombre_cliente.trim() === '') {
+      console.error('❌ ERROR: Nombre vacío o undefined');
+      return NextResponse.json(
+        { error: 'El nombre del cliente es requerido' },
+        { status: 400 }
+      );
+    }
+
+    if (!email_cliente || email_cliente.trim() === '') {
+      console.error('❌ ERROR: Email vacío o undefined');
+      return NextResponse.json(
+        { error: 'El email del cliente es requerido' },
+        { status: 400 }
+      );
+    }
+
+    console.log('✅ Validaciones pasadas, procediendo a crear reserva...');
+
+    // 3️⃣ Crear registro en reservas_cancha (estado procesando)
     const { data: reserva, error: reservaError } = await supabase
       .from('reservas_cancha')
       .insert({
         id_cancha,
         id_cliente: cliente_id,
         fecha: fecha_reserva,
-        hora: hora_inicio,  // Solo guardamos hora_inicio
+        hora: hora_inicio,
         nombre: nombre_cliente,
-        identificacion: identificacion_cliente, // ⚠️ REQUERIDO - necesitas agregarlo
+        identificacion: identificacion_cliente,
         correo: email_cliente,
         telefono: telefono_cliente,
         nota: `Reserva de ${hora_inicio} a ${hora_fin}`,
@@ -81,6 +116,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    console.log('✅ Reserva creada con ID:', reserva.id);
 
     // 4️⃣ Obtener datos del cliente para comisión
     const { data: datosPago, error: datosPagoError } = await supabase
@@ -126,6 +163,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('✅ Transacción creada con ID:', transaccion.id);
+
     // 6️⃣ Crear Payment Link en Wompi
     const wompiData = {
       name: `Reserva Cancha - ${nombre_cliente}`,
@@ -133,9 +172,9 @@ export async function POST(request: NextRequest) {
       single_use: true,
       collect_shipping: false,
       currency: 'COP',
-      amount_in_cents: Math.round(monto_anticipo * 100), // Convertir a centavos
+      amount_in_cents: Math.round(monto_anticipo * 100),
       redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/reserva-exitosa?reference=${reference}`,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 horas
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       reference: reference,
       customer_data: {
         email: email_cliente,
@@ -144,10 +183,9 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log('📤 Creando Payment Link en Wompi:', wompiData);
+    console.log('📤 Creando Payment Link en Wompi...');
 
     const wompiResponse = await fetch('https://sandbox.wompi.co/v1/payment_links', {
-
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${WOMPI_PRIVATE_KEY}`,
@@ -171,7 +209,7 @@ export async function POST(request: NextRequest) {
     }
 
     const paymentLink = await wompiResponse.json();
-    console.log('✅ Payment Link creado:', paymentLink);
+    console.log('✅ Payment Link creado:', paymentLink.data?.permalink);
 
     // 7️⃣ Actualizar transacción con ID de Wompi
     await supabase
@@ -215,7 +253,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    
     const { data: transaccion, error } = await supabase
       .from('transacciones_canchas')
       .select(`
