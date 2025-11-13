@@ -59,19 +59,15 @@ export async function POST(request: NextRequest) {
       .from('reservas_cancha')
       .insert({
         id_cancha,
-        cliente_id,
-        fecha_reserva,
-        hora_inicio,
-        hora_fin,
-        nombre_cliente,
-        telefono_cliente,
-        email_cliente,
-        precio_hora,
-        porcentaje_anticipo,
-        monto_anticipo,
-        monto_pendiente,
-        estado_pago: 'pendiente',
-        estado: 'pendiente'
+        id_cliente: cliente_id,
+        fecha: fecha_reserva,
+        hora: hora_inicio,  // Solo guardamos hora_inicio
+        nombre: nombre_cliente,
+        identificacion: '', // ⚠️ REQUERIDO - necesitas agregarlo
+        correo: email_cliente,
+        telefono: telefono_cliente,
+        nota: `Reserva de ${hora_inicio} a ${hora_fin}`,
+        estado_pago: 'pendiente'
       })
       .select()
       .single();
@@ -97,16 +93,18 @@ export async function POST(request: NextRequest) {
     const { data: transaccion, error: transaccionError } = await supabase
       .from('transacciones_canchas')
       .insert({
-        reserva_id: reserva.id,
-        cliente_id,
+        id_reserva: reserva.id,
+        id_cliente: cliente_id,
         id_cancha,
-        monto_total: precio_hora,
+        referencia_wompi: reference,
+        precio_hora: precio_hora,
         monto_anticipo,
         monto_pendiente,
         comision_plataforma: comisionPlataforma,
         estado: 'pendiente',
-        referencia_pago: reference,
-        metodo_pago: 'wompi'
+        metodo_pago: 'wompi',
+        correo_cliente: email_cliente,
+        telefono_cliente: telefono_cliente
       })
       .select()
       .single();
