@@ -9,12 +9,12 @@ import { supabase } from '@/lib/supabaseClient';
 // const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET!;
 
 // PRUEBAS (comentar en producción):
-const WOMPI_PUBLIC_KEY = 'pub_test_xHSVWM0rB3WZk5kMKZoKIyo5ZUP51zvT';
-const WOMPI_PRIVATE_KEY = 'prv_test_eFdW2YMHDJsFm1SZm9EAPu9qnbXyYuv3';
-const WOMPI_EVENTS_SECRET = 'test_events_secret_123';
+const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY_CANCHA!;
+const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY_CANCHA!;
+const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET_CANCHA!;
 
 interface ReservaData {
-  cancha_id: string;
+  id_cancha: string;
   fecha_reserva: string;
   hora_inicio: string;
   hora_fin: string;
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const reservaData: ReservaData = await request.json();
     
     const {
-      cancha_id,
+      id_cancha,
       fecha_reserva,
       hora_inicio,
       hora_fin,
@@ -52,13 +52,13 @@ export async function POST(request: NextRequest) {
 
     // 2️⃣ Generar reference única
     const timestamp = Date.now();
-    const reference = `cancha_${cancha_id}_${timestamp}`;
+    const reference = `cancha_${id_cancha}_${timestamp}`;
 
     // 3️⃣ Crear registro en reservas_cancha (estado pendiente)
     const { data: reserva, error: reservaError } = await supabase
       .from('reservas_cancha')
       .insert({
-        cancha_id,
+        id_cancha,
         cliente_id,
         fecha_reserva,
         hora_inicio,
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { data: datosPago, error: datosPagoError } = await supabase
       .from('datos_pago_clientes')
       .select('porcentaje_comision')
-      .eq('cliente_id', cliente_id)
+      .eq('id_cliente', cliente_id)
       .single();
 
     const comisionPlataforma = datosPago?.porcentaje_comision || 15;
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       .insert({
         reserva_id: reserva.id,
         cliente_id,
-        cancha_id,
+        id_cancha,
         monto_total: precio_hora,
         monto_anticipo,
         monto_pendiente,
