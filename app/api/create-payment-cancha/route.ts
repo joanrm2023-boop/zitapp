@@ -204,7 +204,6 @@ export async function POST(request: NextRequest) {
       const errorText = JSON.stringify(paymentLink);
       console.error('❌ Error de Wompi:', errorText);
       
-      // Rollback
       await supabase.from('transacciones_canchas').delete().eq('id', transaccion.id);
       await supabase.from('reservas_cancha').delete().eq('id', reserva.id);
 
@@ -214,40 +213,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 🔍 VALIDAR QUE EXISTE EL PERMALINK
-    if (!paymentLink?.data?.permalink) {
-      console.error('❌ Wompi no devolvió permalink. Respuesta:', paymentLink);
+    // 🔍 CONSTRUIR URL DEL PAYMENT LINK
+    if (!paymentLink?.data?.id) {
+      console.error('❌ Wompi no devolvió ID. Respuesta:', paymentLink);
       
-      // Rollback
       await supabase.from('transacciones_canchas').delete().eq('id', transaccion.id);
       await supabase.from('reservas_cancha').delete().eq('id', reserva.id);
       
       return NextResponse.json(
-        { error: 'Wompi no generó link de pago válido', details: JSON.stringify(paymentLink) },
+        { error: 'Wompi no generó ID de pago válido', details: JSON.stringify(paymentLink) },
         { status: 500 }
       );
     }
 
-    console.log('✅ Payment Link creado:', paymentLink.data.permalink);
+    // ✅ Construir URL del payment link
+    const paymentLinkUrl = `https://checkout.wompi.co/l/${paymentLink.data.id}`;
+    console.log('✅ Payment Link creado:', paymentLinkUrl);
 
     // 7️⃣ Actualizar transacción con ID de Wompi
     await supabase
       .from('transacciones_canchas')
       .update({
         wompi_transaction_id: paymentLink.data.id,
-        payment_link: paymentLink.data.permalink
+        payment_link: paymentLinkUrl  // ← Guardar la URL construida
       })
       .eq('id', transaccion.id);
 
     // 8️⃣ Devolver link de pago
     return NextResponse.json({
       success: true,
-      payment_link: paymentLink.data.permalink,
+      payment_link: paymentLinkUrl,  // ← Devolver la URL construida
       reserva_id: reserva.id,
       transaccion_id: transaccion.id,
       reference: reference,
       monto_anticipo: monto_anticipo,
-      expires_at: wompiData.expires_at
+      expires_at: paymentLink.data.expires_at
     });
 
   } catch (error) {
