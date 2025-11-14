@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log('📤 Creando Payment Link en Wompi...');
+    console.log('📤 Datos enviados a Wompi:', wompiData);
 
     const wompiResponse = await fetch('https://sandbox.wompi.co/v1/payment_links', {
       method: 'POST',
@@ -194,11 +194,17 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(wompiData),
     });
 
+    console.log('📥 Wompi response status:', wompiResponse.status);
+    console.log('📥 Wompi response ok:', wompiResponse.ok);
+
+    const paymentLink = await wompiResponse.json();
+    console.log('📥 Wompi response completa:', JSON.stringify(paymentLink, null, 2));
+
     if (!wompiResponse.ok) {
-      const errorText = await wompiResponse.text();
+      const errorText = JSON.stringify(paymentLink);
       console.error('❌ Error de Wompi:', errorText);
       
-      // Rollback: eliminar transacción y reserva
+      // Rollback
       await supabase.from('transacciones_canchas').delete().eq('id', transaccion.id);
       await supabase.from('reservas_cancha').delete().eq('id', reserva.id);
 
@@ -208,8 +214,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const paymentLink = await wompiResponse.json();
-    console.log('✅ Payment Link creado:', paymentLink.data?.permalink);
+    // 🔍 VALIDAR QUE EXISTE EL PERMALINK
+    if (!paymentLink?.data?.permalink) {
+      console.error('❌ Wompi no devolvió permalink. Respuesta:', paymentLink);
+      
+      // Rollback
+      await supabase.from('transacciones_canchas').delete().eq('id', transaccion.id);
+      await supabase.from('reservas_cancha').delete().eq('id', reserva.id);
+      
+      return NextResponse.json(
+        { error: 'Wompi no generó link de pago válido', details: JSON.stringify(paymentLink) },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Payment Link creado:', paymentLink.data.permalink);
 
     // 7️⃣ Actualizar transacción con ID de Wompi
     await supabase
