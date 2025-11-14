@@ -36,6 +36,7 @@ function ReservaExitosaContent() {
           throw new Error('Reserva no encontrada');
         }
 
+        console.log('✅ Datos recibidos:', data);
         setReservaData(data);
         setLoading(false);
 
@@ -83,7 +84,7 @@ function ReservaExitosaContent() {
           </h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <Link
-            href="/dashboard"
+            href="/"
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Volver al inicio
@@ -96,6 +97,9 @@ function ReservaExitosaContent() {
   // ✅ Reserva exitosa
   const { reserva, transaccion } = reservaData;
   const estadoAprobado = transaccion?.estado === 'aprobado';
+  
+  // Calcular porcentaje de anticipo
+  const porcentajeAnticipo = transaccion?.comision_plataforma || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
@@ -106,7 +110,7 @@ function ReservaExitosaContent() {
             <span className="text-5xl">✅</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            {estadoAprobado ? '¡Reserva Confirmada!' : 'Reserva Creada'}
+            {estadoAprobado ? '¡Reserva Confirmada!' : 'Reserva en Proceso'}
           </h1>
           <p className="text-gray-600">
             {estadoAprobado 
@@ -121,97 +125,122 @@ function ReservaExitosaContent() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500 mb-1">Cliente</p>
-              <p className="font-semibold text-gray-800">{reserva.nombre_cliente}</p>
+              <p className="font-semibold text-gray-800">{reserva?.nombre || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Teléfono</p>
-              <p className="font-semibold text-gray-800">{reserva.telefono_cliente}</p>
+              <p className="text-sm text-gray-500 mb-1">Identificación</p>
+              <p className="font-semibold text-gray-800">{reserva?.identificacion || 'N/A'}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Teléfono</p>
+              <p className="font-semibold text-gray-800">{transaccion?.telefono_cliente || reserva?.telefono || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Correo</p>
+              <p className="font-semibold text-gray-800 text-sm">{transaccion?.correo_cliente || reserva?.correo || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500 mb-1">Fecha</p>
               <p className="font-semibold text-gray-800">
-                {new Date(reserva.fecha_reserva).toLocaleDateString('es-CO', {
+                {reserva?.fecha ? new Date(reserva.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
                   weekday: 'short',
                   day: 'numeric',
                   month: 'short',
                   year: 'numeric'
-                })}
+                }) : 'N/A'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Hora inicio</p>
-              <p className="font-semibold text-gray-800">{reserva.hora_inicio}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Hora fin</p>
-              <p className="font-semibold text-gray-800">{reserva.hora_fin}</p>
+              <p className="text-sm text-gray-500 mb-1">Hora</p>
+              <p className="font-semibold text-gray-800">{reserva?.hora || 'N/A'}</p>
             </div>
           </div>
 
           <div>
-            <p className="text-sm text-gray-500 mb-1">Estado</p>
+            <p className="text-sm text-gray-500 mb-1">Estado de Pago</p>
             <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
               estadoAprobado
                 ? 'bg-green-100 text-green-800'
-                : 'bg-yellow-100 text-yellow-800'
+                : transaccion?.estado === 'pendiente'
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-gray-100 text-gray-800'
             }`}>
-              {estadoAprobado ? '✓ Confirmada' : '⏳ Procesando'}
+              {estadoAprobado ? '✓ Confirmada y Pagada' : transaccion?.estado === 'pendiente' ? '⏳ Pendiente' : '📋 Procesando'}
             </span>
           </div>
+
+          {reserva?.nota && (
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Nota</p>
+              <p className="text-sm text-gray-700 bg-blue-50 p-2 rounded">{reserva.nota}</p>
+            </div>
+          )}
         </div>
 
         {/* Resumen de pago */}
-        <div className="mt-6 bg-green-50 rounded-lg p-4 border border-green-200">
-          <h3 className="font-semibold text-green-900 mb-3">💰 Resumen de Pago</h3>
-          
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-700">Precio total:</span>
-              <span className="font-semibold text-gray-900">
-                ${reserva.precio_hora.toLocaleString()} COP
-              </span>
-            </div>
+        {transaccion && (
+          <div className="mt-6 bg-green-50 rounded-lg p-4 border border-green-200">
+            <h3 className="font-semibold text-green-900 mb-3">💰 Resumen de Pago</h3>
             
-            <div className="flex justify-between text-green-700">
-              <span>Anticipo pagado ({reserva.porcentaje_anticipo}%):</span>
-              <span className="font-semibold">
-                ${reserva.monto_anticipo.toLocaleString()} COP
-              </span>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Precio por hora:</span>
+                <span className="font-semibold text-gray-900">
+                  ${parseFloat(transaccion.precio_hora).toLocaleString('es-CO')} COP
+                </span>
+              </div>
+              
+              <div className="flex justify-between text-green-700">
+                <span>Anticipo pagado ({porcentajeAnticipo}%):</span>
+                <span className="font-semibold">
+                  ${parseFloat(transaccion.monto_anticipo).toLocaleString('es-CO')} COP
+                </span>
+              </div>
+              
+              <div className="flex justify-between border-t border-green-300 pt-2">
+                <span className="text-gray-700 font-medium">Pendiente en sitio:</span>
+                <span className="font-bold text-gray-900">
+                  ${parseFloat(transaccion.monto_pendiente).toLocaleString('es-CO')} COP
+                </span>
+              </div>
             </div>
-            
-            <div className="flex justify-between border-t border-green-300 pt-2">
-              <span className="text-gray-700 font-medium">Pendiente en sitio:</span>
-              <span className="font-bold text-gray-900">
-                ${reserva.monto_pendiente.toLocaleString()} COP
-              </span>
-            </div>
-          </div>
 
-          <div className="mt-4 bg-white p-3 rounded border border-green-200">
-            <p className="text-xs text-gray-600">
-              <strong>📌 Recordatorio:</strong> Debes pagar{' '}
-              <strong>${reserva.monto_pendiente.toLocaleString()} COP</strong>{' '}
-              directamente en el sitio al momento de usar la cancha.
-            </p>
+            <div className="mt-4 bg-white p-3 rounded border border-green-200">
+              <p className="text-xs text-gray-600">
+                <strong>📌 Recordatorio:</strong> Debes pagar{' '}
+                <strong>${parseFloat(transaccion.monto_pendiente).toLocaleString('es-CO')} COP</strong>{' '}
+                directamente en el sitio al momento de usar la cancha.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Información de referencia */}
         <div className="mt-6 bg-gray-50 rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">Referencia de pago:</p>
-          <p className="font-mono text-sm text-gray-700">{reference}</p>
+          <p className="font-mono text-sm text-gray-700 break-all">{reference}</p>
+          
+          {transaccion?.wompi_transaction_id && (
+            <>
+              <p className="text-xs text-gray-500 mb-1 mt-2">ID Transacción Wompi:</p>
+              <p className="font-mono text-xs text-gray-600 break-all">{transaccion.wompi_transaction_id}</p>
+            </>
+          )}
         </div>
 
         {/* Botones de acción */}
         <div className="mt-8 flex gap-4">
           <Link
-            href="/dashboard"
+            href="/"
             className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center font-semibold"
           >
-            Ir al Dashboard
+            Volver al Inicio
           </Link>
           <button
             onClick={() => window.print()}
@@ -221,10 +250,12 @@ function ReservaExitosaContent() {
           </button>
         </div>
 
-        {/* Mensaje de confirmación por email */}
-        <p className="text-xs text-center text-gray-500 mt-6">
-          Hemos enviado un correo de confirmación a <strong>{reserva.email_cliente}</strong>
-        </p>
+        {/* Mensaje de confirmación */}
+        {transaccion?.correo_cliente && (
+          <p className="text-xs text-center text-gray-500 mt-6">
+            Se ha enviado la confirmación a <strong>{transaccion.correo_cliente}</strong>
+          </p>
+        )}
       </div>
     </div>
   );
