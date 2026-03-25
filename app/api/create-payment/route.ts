@@ -1,5 +1,5 @@
 // app/api/create-payment/route.ts
-// ⚠️ VERSIÓN SANDBOX - Solo para pruebas con llaves pub_test_ y prv_test_
+// ✅ VERSIÓN PRODUCCIÓN
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
@@ -9,13 +9,12 @@ const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY!;
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== INICIO API CREATE-PAYMENT (SANDBOX) ===');
+    console.log('=== INICIO API CREATE-PAYMENT ===');
     
     const { planId, precio, nombrePlan, userData, userId, notificaciones } = await request.json();
     
     console.log('Datos recibidos:', { planId, precio, nombrePlan, userData, userId, notificaciones });
 
-    // Validar que tenemos los datos necesarios
     if (!planId || !precio || !nombrePlan || !userData) {
       console.log('ERROR: Faltan datos requeridos');
       return NextResponse.json({ error: 'Faltan datos requeridos' }, { status: 400 });
@@ -29,7 +28,6 @@ export async function POST(request: NextRequest) {
     console.log('Usuario ID recibido:', userId || 'No autenticado');
     console.log('Notificaciones seleccionadas:', notificaciones || false);
 
-    // Generar referencia única
     const timestamp = Date.now();
     const reference = userId 
       ? `plan_${planId}_${userId}_${timestamp}`
@@ -37,14 +35,13 @@ export async function POST(request: NextRequest) {
 
     console.log('Referencia generada:', reference);
 
-    // Crear payment link en Wompi SANDBOX
     const acceptanceToken = await getAcceptanceToken();
-      if (!acceptanceToken) {
-        return NextResponse.json({ error: 'No se pudo obtener acceptance token de Wompi' }, { status: 500 });
-      }
+    if (!acceptanceToken) {
+      return NextResponse.json({ error: 'No se pudo obtener acceptance token de Wompi' }, { status: 500 });
+    }
 
-      const wompiPayload = {
-        "acceptance_token": acceptanceToken,
+    const wompiPayload = {
+      "acceptance_token": acceptanceToken,
       "name": "Test Plan",
       "description": "Test payment",
       "single_use": true,
@@ -58,9 +55,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Payload para Wompi:', wompiPayload);
 
-    // ✅ URL SANDBOX
-    console.log('Llamando a Wompi Sandbox Payment Links...');
-    const wompiResponse = await fetch('https://sandbox.wompi.co/v1/payment_links', {
+    console.log('Llamando a Wompi Payment Links...');
+    const wompiResponse = await fetch('https://production.wompi.co/v1/payment_links', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${WOMPI_PRIVATE_KEY}`,
@@ -86,7 +82,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Debugging intensivo
     console.log('=== DEBUGGING LINK ===');
     console.log('wompiData tiene data?', !!wompiData.data);
     console.log('data tiene id?', !!wompiData.data?.id);
@@ -96,12 +91,10 @@ export async function POST(request: NextRequest) {
     const linkId = wompiData.data.id;
     console.log('linkId extraído:', linkId);
 
-    // ✅ URL SANDBOX para checkout
     const paymentLink = linkId ? `https://checkout.wompi.co/l/${linkId}` : null;
     console.log('Link construido:', paymentLink);
     console.log('=== FIN DEBUGGING ===');
 
-    // Guardar referencia del pago en base de datos
     try {
       console.log('Guardando transacción en BD...');
       console.log('userId que se guardará:', userId);
@@ -133,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Link final a devolver:', paymentLink);
-    console.log('=== FIN API CREATE-PAYMENT SANDBOX (ÉXITO) ===');
+    console.log('=== FIN API CREATE-PAYMENT (ÉXITO) ===');
 
     return NextResponse.json({ 
       payment_link: paymentLink,
@@ -148,17 +141,22 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ Función para obtener acceptance token desde SANDBOX
+// ✅ Función fuera del POST — única definición
 async function getAcceptanceToken() {
   try {
-    console.log('Obteniendo acceptance token (sandbox)...');
-    const response = await fetch('https://sandbox.wompi.co/v1/merchants/' + WOMPI_PUBLIC_KEY, {
+    console.log('Obteniendo acceptance token...');
+    console.log('KEY primeros chars:', WOMPI_PUBLIC_KEY?.substring(0, 20));
+
+    const response = await fetch('https://production.wompi.co/v1/merchants/' + WOMPI_PUBLIC_KEY, {
       headers: {
         'Authorization': `Bearer ${WOMPI_PUBLIC_KEY}`,
       },
     });
-    
+
+    console.log('Status Wompi merchants:', response.status);
     const data = await response.json();
+    console.log('Respuesta completa Wompi:', JSON.stringify(data));
+
     console.log('Acceptance token obtenido:', data.data?.presigned_acceptance?.acceptance_token ? 'Sí' : 'No');
     return data.data.presigned_acceptance.acceptance_token;
   } catch (error) {
