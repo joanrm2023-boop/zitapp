@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-email/render": "^1.4.0",
     "@supabase/supabase-js": "^2.50.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.18",
