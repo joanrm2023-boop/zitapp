@@ -27,12 +27,10 @@ export default function MiNegocioPage() {
   const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // Estados para el calendario de días bloqueados
   const [mesActual, setMesActual] = useState(new Date());
   const [diasBloqueadosEspecificos, setDiasBloqueadosEspecificos] = useState<string[]>([]);
   const [cargandoDiasBloqueados, setCargandoDiasBloqueados] = useState(false);
 
-  // Estados para el modal de cambio de contraseña
   const [modalAbierto, setModalAbierto] = useState(false);
   const [contrasenaActual, setContrasenaActual] = useState('');
   const [contrasenaNueva, setContrasenaNueva] = useState('');
@@ -42,15 +40,12 @@ export default function MiNegocioPage() {
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
   const [cambiandoContrasena, setCambiandoContrasena] = useState(false);
 
-  // Estados para modal de conflicto de horarios
   const [modalConflicto, setModalConflicto] = useState<{
     visible: boolean;
     citas: any[];
   }>({ visible: false, citas: [] });
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     generarBloques();
@@ -76,97 +71,50 @@ export default function MiNegocioPage() {
         setCliente(data);
         setNombre(data.nombre);
         setCorreo(data.correo);
-
         const diasConHorario = Object.keys(data.rango_horarios || {});
         const primerDia = diasConHorario[0];
         const horario = data.rango_horarios?.[primerDia] || { inicio: '10:00', fin: '20:00' };
-
         setRangoInicio(horario.inicio);
         setRangoFin(horario.fin);
         setIntervalo(data.intervalo_citas || 45);
         setDiasNoDisponibles(data.dias_no_disponibles || []);
         setHorasNoDisponibles(data.horas_no_disponibles || {});
       }
-
       setLoading(false);
     };
-
     obtenerDatos();
   }, []);
 
   useEffect(() => {
-    if (cliente) {
-      cargarDiasBloqueados();
-    }
+    if (cliente) { cargarDiasBloqueados(); }
   }, [cliente]);
 
   const subirLogo = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !cliente) return;
-
-    // Validaciones
-    if (file.size > 1024 * 1024) { // 1MB
-      toast.error("El archivo es muy grande. Máximo 1MB.");
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      toast.error("Solo se permiten archivos de imagen.");
-      return;
-    }
-
+    if (file.size > 1024 * 1024) { toast.error("El archivo es muy grande. Máximo 1MB."); return; }
+    if (!file.type.startsWith('image/')) { toast.error("Solo se permiten archivos de imagen."); return; }
     setSubiendoLogo(true);
-    
     try {
-      // Eliminar logo anterior si existe
       if (cliente.logo_url) {
         const nombreAnterior = cliente.logo_url.split('/').pop();
-        await supabase.storage
-          .from('logos')
-          .remove([nombreAnterior]);
+        await supabase.storage.from('logos').remove([nombreAnterior]);
       }
-
-      // Generar nombre único para el archivo
       const fileExt = file.name.split('.').pop();
       const fileName = `${cliente.id_cliente}-${Date.now()}.${fileExt}`;
-      
-      // Subir archivo a Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('logos')
-        .upload(fileName, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Obtener URL pública del archivo
-      const { data: urlData } = supabase.storage
-        .from('logos')
-        .getPublicUrl(fileName);
-
+      const { data: uploadData, error: uploadError } = await supabase.storage.from('logos').upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName);
       const logoUrl = urlData.publicUrl;
-
-      // Actualizar la base de datos con la nueva URL
-      const { error: updateError } = await supabase
-        .from('clientes')
-        .update({ logo_url: logoUrl })
-        .eq('id_cliente', cliente.id_cliente);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Actualizar el estado local
+      const { error: updateError } = await supabase.from('clientes').update({ logo_url: logoUrl }).eq('id_cliente', cliente.id_cliente);
+      if (updateError) throw updateError;
       setCliente(prev => ({ ...prev, logo_url: logoUrl }));
-      
       toast.success("✅ Logo subido correctamente");
-      
     } catch (error) {
       console.error('Error subiendo logo:', error);
       toast.error("Error al subir el logo: " + error.message);
     } finally {
       setSubiendoLogo(false);
-      // Limpiar el input
       event.target.value = '';
     }
   };
@@ -174,456 +122,191 @@ export default function MiNegocioPage() {
   const generarBloques = () => {
     const start = convertirAHoras(rangoInicio);
     const end = convertirAHoras(rangoFin);
-
-    if (!intervalo || intervalo < 5 || isNaN(intervalo)) {
-      setIntervaloInvalido(true);
-      return;
-    }
-
+    if (!intervalo || intervalo < 5 || isNaN(intervalo)) { setIntervaloInvalido(true); return; }
     setIntervaloInvalido(false);
-
     let bloquesGenerados: Record<string, string[]> = {};
-
     diasSemana.forEach((dia) => {
       if (diasNoDisponibles.includes(dia)) return;
-
       let actual = start;
       let bloquesDia: string[] = [];
-      while (actual < end) {
-        bloquesDia.push(convertirATexto(actual));
-        actual += intervalo;
-      }
+      while (actual < end) { bloquesDia.push(convertirATexto(actual)); actual += intervalo; }
       bloquesGenerados[dia] = bloquesDia;
     });
-
     setBloques(bloquesGenerados);
   };
 
-  const convertirAHoras = (str: string) => {
-    const [h, m] = str.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const convertirATexto = (mins: number) => {
-    const h = String(Math.floor(mins / 60)).padStart(2, '0');
-    const m = String(mins % 60).padStart(2, '0');
-    return `${h}:${m}`;
-  };
-
-  const toggleDia = (dia: string) => {
-    setDiasAbiertos((prev) => ({ ...prev, [dia]: !prev[dia] }));
-  };
+  const convertirAHoras = (str: string) => { const [h, m] = str.split(':').map(Number); return h * 60 + m; };
+  const convertirATexto = (mins: number) => { const h = String(Math.floor(mins / 60)).padStart(2, '0'); const m = String(mins % 60).padStart(2, '0'); return `${h}:${m}`; };
+  const toggleDia = (dia: string) => { setDiasAbiertos((prev) => ({ ...prev, [dia]: !prev[dia] })); };
 
   const toggleHora = (dia: string, hora: string) => {
     setHorasNoDisponibles((prev) => {
       const actuales = prev[dia] || [];
-      const nuevas = actuales.includes(hora)
-        ? actuales.filter((h) => h !== hora)
-        : [...actuales, hora];
-
-      setDiasAbiertos((prevAbiertos) => ({
-        ...prevAbiertos,
-        [dia]: nuevas.length > 0,
-      }));
-
+      const nuevas = actuales.includes(hora) ? actuales.filter((h) => h !== hora) : [...actuales, hora];
+      setDiasAbiertos((prevAbiertos) => ({ ...prevAbiertos, [dia]: nuevas.length > 0 }));
       return { ...prev, [dia]: nuevas };
     });
   };
 
   const verificarConflictosHorario = async () => {
     if (!cliente) return { hayConflicto: false, citasAfectadas: [] };
-
-    const { data: clienteActual } = await supabase
-      .from('clientes')
-      .select('dias_no_disponibles, horas_no_disponibles')
-      .eq('id_cliente', cliente.id_cliente)
-      .single();
-
+    const { data: clienteActual } = await supabase.from('clientes').select('dias_no_disponibles, horas_no_disponibles').eq('id_cliente', cliente.id_cliente).single();
     console.log('🔍 Datos actuales en BD:', clienteActual);
     console.log('🔍 Días NO disponibles (nuevo):', diasNoDisponibles);
     console.log('🔍 Horas NO disponibles (nuevo):', horasNoDisponibles);
-
     const hoy = new Date().toISOString().split('T')[0];
-    
-    const { data: reservasPendientes, error } = await supabase
-      .from('reservas')
-      .select('id, nombre, correo, identificacion, telefono, fecha, hora, id_barbero')
-      .eq('id_cliente', cliente.id_cliente)
-      .eq('estado', 'pendiente')
-      .gte('fecha', hoy);
-
+    const { data: reservasPendientes, error } = await supabase.from('reservas').select('id, nombre, correo, identificacion, telefono, fecha, hora, id_barbero').eq('id_cliente', cliente.id_cliente).eq('estado', 'pendiente').gte('fecha', hoy);
     console.log('📅 Reservas pendientes encontradas:', reservasPendientes);
-
-    if (error) {
-      console.error('Error consultando reservas:', error);
-      return { hayConflicto: false, citasAfectadas: [] };
-    }
-
+    if (error) { console.error('Error consultando reservas:', error); return { hayConflicto: false, citasAfectadas: [] }; }
     const diasNoDisponiblesActuales = clienteActual.dias_no_disponibles || [];
     const horasNoDisponiblesActuales = clienteActual.horas_no_disponibles || {};
-
     const citasAfectadas: any[] = [];
-
     reservasPendientes?.forEach((reserva) => {
       const diaSemana = obtenerDiaSemana(reserva.fecha);
-      
       console.log(`🔄 Procesando reserva: ${reserva.nombre} - Fecha: ${reserva.fecha} - Día: ${diaSemana}`);
-      console.log(`   ¿Día estaba bloqueado? ${diasNoDisponiblesActuales.includes(diaSemana)}`);
-      console.log(`   ¿Día se bloquea ahora? ${diasNoDisponibles.includes(diaSemana)}`);
-      
-      const diaSeBloqueoAhora = diasNoDisponibles.includes(diaSemana) && 
-                                !diasNoDisponiblesActuales.includes(diaSemana);
-      
-      console.log(`   ✅ ¿Es conflicto de día? ${diaSeBloqueoAhora}`);
-      
-      if (diaSeBloqueoAhora) {
-        citasAfectadas.push(reserva);
-        return;
-      }
-
-      const horaEstabaBloqueada = horasNoDisponiblesActuales[diaSemana]?.includes(reserva.hora);
+      const diaSeBloqueoAhora = diasNoDisponibles.includes(diaSemana) && !diasNoDisponiblesActuales.includes(diaSemana);
+      if (diaSeBloqueoAhora) { citasAfectadas.push(reserva); return; }
       const horaAhoraBloqueada = horasNoDisponibles[diaSemana]?.includes(reserva.hora);
-      
-      console.log(`   Hora: ${reserva.hora}`);
-      console.log(`   ¿Hora estaba bloqueada? ${horaEstabaBloqueada}`);
-      console.log(`   ¿Hora se bloquea ahora? ${horaAhoraBloqueada}`);
-      console.log(`   ✅ ¿Es conflicto de hora? ${horaAhoraBloqueada && !horaEstabaBloqueada}`);
-      
-      if (horaAhoraBloqueada && !horaEstabaBloqueada) {
-        citasAfectadas.push(reserva);
-      }
+      const horaEstabaBloqueada = horasNoDisponiblesActuales[diaSemana]?.includes(reserva.hora);
+      if (horaAhoraBloqueada && !horaEstabaBloqueada) { citasAfectadas.push(reserva); }
     });
-
     console.log('🎯 TOTAL citas afectadas:', citasAfectadas);
-
-    return {
-      hayConflicto: citasAfectadas.length > 0,
-      citasAfectadas
-    };
+    return { hayConflicto: citasAfectadas.length > 0, citasAfectadas };
   };
 
   const cargarDiasBloqueados = async () => {
     if (!cliente) return;
-    
     setCargandoDiasBloqueados(true);
     try {
-      const { data, error } = await supabase
-        .from('dias_bloqueados')
-        .select('fecha')
-        .eq('id_cliente', cliente.id_cliente);
-
+      const { data, error } = await supabase.from('dias_bloqueados').select('fecha').eq('id_cliente', cliente.id_cliente);
       if (error) throw error;
-
-      const fechas = data?.map(d => d.fecha) || [];
-      setDiasBloqueadosEspecificos(fechas);
-    } catch (error) {
-      console.error('Error cargando días bloqueados:', error);
-    } finally {
-      setCargandoDiasBloqueados(false);
-    }
+      setDiasBloqueadosEspecificos(data?.map(d => d.fecha) || []);
+    } catch (error) { console.error('Error cargando días bloqueados:', error); }
+    finally { setCargandoDiasBloqueados(false); }
   };
 
   const toggleDiaBloqueado = async (fecha: string) => {
     if (!cliente) return;
-
     const yaEstaBloqueado = diasBloqueadosEspecificos.includes(fecha);
-
     try {
       if (yaEstaBloqueado) {
-        // Desbloquear
-        const { error } = await supabase
-          .from('dias_bloqueados')
-          .delete()
-          .eq('id_cliente', cliente.id_cliente)
-          .eq('fecha', fecha);
-
+        const { error } = await supabase.from('dias_bloqueados').delete().eq('id_cliente', cliente.id_cliente).eq('fecha', fecha);
         if (error) throw error;
-
         setDiasBloqueadosEspecificos(prev => prev.filter(f => f !== fecha));
         toast.success('✅ Día desbloqueado');
       } else {
-        // NUEVO: Antes de bloquear, verificar si hay citas pendientes ese día
-        const { data: citasEnFecha, error: errorCitas } = await supabase
-          .from('reservas')
-          .select('id, nombre, correo, telefono, hora')
-          .eq('id_cliente', cliente.id_cliente)
-          .eq('fecha', fecha)
-          .eq('estado', 'pendiente');
-
-        if (errorCitas) {
-          console.error('Error consultando citas:', errorCitas);
-          toast.error('Error al verificar citas existentes');
-          return;
-        }
-
-        // Si hay citas, mostrar modal de conflicto
+        const { data: citasEnFecha, error: errorCitas } = await supabase.from('reservas').select('id, nombre, correo, telefono, hora').eq('id_cliente', cliente.id_cliente).eq('fecha', fecha).eq('estado', 'pendiente');
+        if (errorCitas) { toast.error('Error al verificar citas existentes'); return; }
         if (citasEnFecha && citasEnFecha.length > 0) {
-          setModalConflicto({
-            visible: true,
-            citas: citasEnFecha.map(cita => ({
-              ...cita,
-              fecha: fecha,
-              id_barbero: null
-            }))
-          });
+          setModalConflicto({ visible: true, citas: citasEnFecha.map(cita => ({ ...cita, fecha, id_barbero: null })) });
           toast.error(`❌ No puedes bloquear este día. Hay ${citasEnFecha.length} cita${citasEnFecha.length > 1 ? 's' : ''} pendiente${citasEnFecha.length > 1 ? 's' : ''}`);
           return;
         }
-
-        // Si no hay citas, proceder a bloquear
-        const { error } = await supabase
-          .from('dias_bloqueados')
-          .insert({
-            id_cliente: cliente.id_cliente,
-            fecha: fecha,
-          });
-
+        const { error } = await supabase.from('dias_bloqueados').insert({ id_cliente: cliente.id_cliente, fecha });
         if (error) throw error;
-
         setDiasBloqueadosEspecificos(prev => [...prev, fecha]);
         toast.success('✅ Día bloqueado');
       }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al actualizar el día');
-    }
+    } catch (error) { console.error('Error:', error); toast.error('Error al actualizar el día'); }
   };
 
-    const generarDiasDelMes = () => {
-      const año = mesActual.getFullYear();
-      const mes = mesActual.getMonth();
-      
-      const primerDia = new Date(año, mes, 1);
-      const ultimoDia = new Date(año, mes + 1, 0);
-      
-      const dias: Array<Date | null> = [];
-      
-      // Agregar días vacíos al inicio
-      const diaSemanaInicio = primerDia.getDay();
-      const diasVaciosInicio = diaSemanaInicio === 0 ? 6 : diaSemanaInicio - 1;
-      
-      for (let i = 0; i < diasVaciosInicio; i++) {
-        dias.push(null);
-      }
-      
-      // Agregar todos los días del mes
-      for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
-        dias.push(new Date(año, mes, dia));
-      }
-      
-      return dias;
-    };
+  const generarDiasDelMes = () => {
+    const año = mesActual.getFullYear();
+    const mes = mesActual.getMonth();
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+    const dias: Array<Date | null> = [];
+    const diaSemanaInicio = primerDia.getDay();
+    const diasVaciosInicio = diaSemanaInicio === 0 ? 6 : diaSemanaInicio - 1;
+    for (let i = 0; i < diasVaciosInicio; i++) dias.push(null);
+    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) dias.push(new Date(año, mes, dia));
+    return dias;
+  };
 
-    const cambiarMes = (direccion: number) => {
-      setMesActual(prev => {
-        const nuevo = new Date(prev);
-        nuevo.setMonth(nuevo.getMonth() + direccion);
-        return nuevo;
-      });
-    };
+  const cambiarMes = (direccion: number) => {
+    setMesActual(prev => { const nuevo = new Date(prev); nuevo.setMonth(nuevo.getMonth() + direccion); return nuevo; });
+  };
 
-    const formatearFecha = (fecha: Date): string => {
-      const año = fecha.getFullYear();
-      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-      const dia = String(fecha.getDate()).padStart(2, '0');
-      return `${año}-${mes}-${dia}`;
-    };
+  const formatearFecha = (fecha: Date): string => {
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
 
-    const esDiaPasado = (fecha: Date): boolean => {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      const fechaComparar = new Date(fecha);
-      fechaComparar.setHours(0, 0, 0, 0);
-      return fechaComparar < hoy;
-    };
+  const esDiaPasado = (fecha: Date): boolean => {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const fechaComparar = new Date(fecha); fechaComparar.setHours(0, 0, 0, 0);
+    return fechaComparar < hoy;
+  };
 
-  // Función auxiliar para obtener día de la semana
   const obtenerDiaSemana = (fecha: string): string => {
     const diasMap = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-    const date = new Date(fecha + 'T00:00:00');
-    return diasMap[date.getDay()];
+    return diasMap[new Date(fecha + 'T00:00:00').getDay()];
   };
 
   const handleGuardar = async () => {
     if (!cliente || guardando) return;
-
     setGuardando(true);
-
     try {
-      // Obtener datos actuales de la BD para comparar
-      const { data: datosActuales } = await supabase
-        .from('clientes')
-        .select('dias_no_disponibles, horas_no_disponibles, rango_horarios, intervalo_citas')
-        .eq('id_cliente', cliente.id_cliente)
-        .single();
-
-      // Verificar si realmente hay cambios
-      const huboCAmbios = 
-        JSON.stringify(datosActuales.dias_no_disponibles || []) !== JSON.stringify(diasNoDisponibles) ||
-        JSON.stringify(datosActuales.horas_no_disponibles || {}) !== JSON.stringify(horasNoDisponibles) ||
-        datosActuales.intervalo_citas !== intervalo;
-
-      if (!huboCAmbios) {
-        toast.error('No hay cambios para guardar');
-        return;
-      }
-
-      // Verificar conflictos SOLO si hay cambios
+      const { data: datosActuales } = await supabase.from('clientes').select('dias_no_disponibles, horas_no_disponibles, rango_horarios, intervalo_citas').eq('id_cliente', cliente.id_cliente).single();
+      const huboCAmbios = JSON.stringify(datosActuales.dias_no_disponibles || []) !== JSON.stringify(diasNoDisponibles) || JSON.stringify(datosActuales.horas_no_disponibles || {}) !== JSON.stringify(horasNoDisponibles) || datosActuales.intervalo_citas !== intervalo;
+      if (!huboCAmbios) { toast.error('No hay cambios para guardar'); return; }
       const { hayConflicto, citasAfectadas } = await verificarConflictosHorario();
-      
       if (hayConflicto) {
-        setModalConflicto({
-          visible: true,
-          citas: citasAfectadas
-        });
-        
-        // Restaurar estado original
+        setModalConflicto({ visible: true, citas: citasAfectadas });
         setDiasNoDisponibles(datosActuales.dias_no_disponibles || []);
         setHorasNoDisponibles(datosActuales.horas_no_disponibles || {});
-        
         const abiertos: Record<string, boolean> = {};
-        for (const dia of diasSemana) {
-          abiertos[dia] = false;
-        }
+        for (const dia of diasSemana) abiertos[dia] = false;
         setDiasAbiertos(abiertos);
-        
         return;
       }
-
-      // Si llegamos aquí, guardar cambios
       const rangoPorDia: Record<string, { inicio: string; fin: string }> = {};
-      diasSemana.forEach((dia) => {
-        if (!diasNoDisponibles.includes(dia)) {
-          rangoPorDia[dia] = {
-            inicio: rangoInicio,
-            fin: rangoFin,
-          };
-        }
-      });
-
+      diasSemana.forEach((dia) => { if (!diasNoDisponibles.includes(dia)) rangoPorDia[dia] = { inicio: rangoInicio, fin: rangoFin }; });
       const horasFiltradas: Record<string, string[]> = {};
-      Object.entries(horasNoDisponibles).forEach(([dia, horas]) => {
-        if (horas.length > 0) {
-          horasFiltradas[dia] = horas;
-        }
-      });
-
-      const res = await supabase
-        .from('clientes')
-        .update({
-          rango_horarios: rangoPorDia,
-          intervalo_citas: intervalo,
-          dias_no_disponibles: diasNoDisponibles,
-          horas_no_disponibles: horasFiltradas,
-        })
-        .eq('id_cliente', cliente.id_cliente);
-
-      if (res.error) {
-        toast.error('Error al guardar: ' + res.error.message);
-      } else {
+      Object.entries(horasNoDisponibles).forEach(([dia, horas]) => { if (horas.length > 0) horasFiltradas[dia] = horas; });
+      const res = await supabase.from('clientes').update({ rango_horarios: rangoPorDia, intervalo_citas: intervalo, dias_no_disponibles: diasNoDisponibles, horas_no_disponibles: horasFiltradas }).eq('id_cliente', cliente.id_cliente);
+      if (res.error) { toast.error('Error al guardar: ' + res.error.message); }
+      else {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setMensajeVisible(true);
         setTimeout(() => setMensajeVisible(false), 3000);
-
-        const { data } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('id_cliente', cliente.id_cliente)
-          .maybeSingle();
-
+        const { data } = await supabase.from('clientes').select('*').eq('id_cliente', cliente.id_cliente).maybeSingle();
         if (data) {
           const diasConHorario = Object.keys(data.rango_horarios || {});
           const primerDia = diasConHorario[0];
           const horario = data.rango_horarios?.[primerDia] || { inicio: '10:00', fin: '20:00' };
-
-          setRangoInicio(horario.inicio);
-          setRangoFin(horario.fin);
-          setIntervalo(data.intervalo_citas || 45);
-          setDiasNoDisponibles(data.dias_no_disponibles || []);
-          setHorasNoDisponibles(data.horas_no_disponibles || {});
-
+          setRangoInicio(horario.inicio); setRangoFin(horario.fin); setIntervalo(data.intervalo_citas || 45);
+          setDiasNoDisponibles(data.dias_no_disponibles || []); setHorasNoDisponibles(data.horas_no_disponibles || {});
           const abiertos: Record<string, boolean> = {};
-          for (const dia of diasSemana) {
-            abiertos[dia] = false;
-          }
+          for (const dia of diasSemana) abiertos[dia] = false;
           setDiasAbiertos(abiertos);
         }
       }
-    } finally {
-      setGuardando(false);
-    }
+    } finally { setGuardando(false); }
   };
 
   const handleCambiarContrasena = async () => {
-    // Validaciones
-    if (!contrasenaActual || !contrasenaNueva || !contrasenaConfirmar) {
-      toast.error("Por favor completa todos los campos");
-      return;
-    }
-
-    if (contrasenaNueva.length < 6) {
-      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-
-    if (contrasenaNueva !== contrasenaConfirmar) {
-      toast.error("Las contraseñas nuevas no coinciden");
-      return;
-    }
-
-    if (contrasenaActual === contrasenaNueva) {
-      toast.error("La nueva contraseña debe ser diferente a la actual");
-      return;
-    }
-
+    if (!contrasenaActual || !contrasenaNueva || !contrasenaConfirmar) { toast.error("Por favor completa todos los campos"); return; }
+    if (contrasenaNueva.length < 6) { toast.error("La nueva contraseña debe tener al menos 6 caracteres"); return; }
+    if (contrasenaNueva !== contrasenaConfirmar) { toast.error("Las contraseñas nuevas no coinciden"); return; }
+    if (contrasenaActual === contrasenaNueva) { toast.error("La nueva contraseña debe ser diferente a la actual"); return; }
     setCambiandoContrasena(true);
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user?.email) {
-        toast.error("No se pudo obtener el usuario actual");
-        return;
-      }
-
-      // Verificar contraseña actual
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: contrasenaActual,
-      });
-
-      if (signInError) {
-        toast.error("La contraseña actual es incorrecta");
-        return;
-      }
-
-      // Actualizar contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: contrasenaNueva
-      });
-
-      if (updateError) {
-        toast.error("Error al cambiar la contraseña: " + updateError.message);
-        return;
-      }
-
+      if (!user?.email) { toast.error("No se pudo obtener el usuario actual"); return; }
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: contrasenaActual });
+      if (signInError) { toast.error("La contraseña actual es incorrecta"); return; }
+      const { error: updateError } = await supabase.auth.updateUser({ password: contrasenaNueva });
+      if (updateError) { toast.error("Error al cambiar la contraseña: " + updateError.message); return; }
       toast.success("✅ Contraseña actualizada correctamente");
-      
-      // Limpiar y cerrar modal
-      setContrasenaActual('');
-      setContrasenaNueva('');
-      setContrasenaConfirmar('');
+      setContrasenaActual(''); setContrasenaNueva(''); setContrasenaConfirmar('');
       setModalAbierto(false);
-      
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error("Error inesperado al cambiar la contraseña");
-    } finally {
-      setCambiandoContrasena(false);
-    }
+    } catch (error) { console.error('Error:', error); toast.error("Error inesperado al cambiar la contraseña"); }
+    finally { setCambiandoContrasena(false); }
   };
 
-  // Calcular estadísticas
   const diasDisponibles = diasSemana.length - diasNoDisponibles.length;
   const horasDisponiblesPorDia = convertirAHoras(rangoFin) - convertirAHoras(rangoInicio);
   const totalHorasSemanales = diasDisponibles * (horasDisponiblesPorDia / 60);
@@ -635,202 +318,485 @@ export default function MiNegocioPage() {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="max-w-6xl mx-auto p-4"
+      style={{ maxWidth: 900, margin: '0 auto' }}
     >
-      <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-900">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+        .mn-card {
+          background: #1E3A5C;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
+          padding: 20px;
+          margin-bottom: 16px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        }
+
+        .mn-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          color: #94A3B8;
+          margin-bottom: 6px;
+          display: block;
+        }
+
+        .mn-input {
+          width: 100%;
+          background: #0F2438;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          padding: 10px 14px;
+          color: white;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 14px;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+        .mn-input:focus {
+          border-color: rgba(37,99,235,0.6);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+        .mn-input:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .mn-input::placeholder { color: #475569; }
+
+        .mn-input-icon {
+          position: relative;
+        }
+        .mn-input-icon input {
+          padding-left: 36px;
+        }
+        .mn-input-icon svg {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #475569;
+          pointer-events: none;
+        }
+
+        .mn-section-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 16px;
+          font-weight: 800;
+          color: white;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .mn-btn-primary {
+          background: #2563EB;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 18px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+        }
+        .mn-btn-primary:hover { background: #1D4ED8; transform: translateY(-1px); }
+        .mn-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .mn-btn-secondary {
+          background: rgba(255,255,255,0.06);
+          color: #CBD5E1;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          padding: 10px 18px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .mn-btn-secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+
+        .mn-btn-dark {
+          background: rgba(255,255,255,0.08);
+          color: #CBD5E1;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          padding: 10px 18px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .mn-btn-dark:hover { background: rgba(255,255,255,0.14); color: white; }
+
+        .mn-divider {
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+          margin: 16px 0;
+        }
+
+        .mn-dia-btn {
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-transform: capitalize;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .mn-hora-btn {
+          padding: 7px 12px;
+          font-size: 12px;
+          border-radius: 8px;
+          border: none;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.2s;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .mn-hora-disponible {
+          background: rgba(255,255,255,0.06);
+          color: #94A3B8;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+        }
+        .mn-hora-disponible:hover { background: rgba(255,255,255,0.12); color: white; }
+        .mn-hora-bloqueada {
+          background: rgba(239,68,68,0.2);
+          color: #FCA5A5;
+          border: 1px solid rgba(239,68,68,0.3) !important;
+        }
+        .mn-hora-bloqueada:hover { background: rgba(239,68,68,0.3); }
+
+        .mn-acord-header {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          background: rgba(255,255,255,0.04);
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: background 0.2s;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          color: #CBD5E1;
+          text-transform: capitalize;
+        }
+        .mn-acord-header:hover { background: rgba(255,255,255,0.08); color: white; }
+
+        .mn-acord-body {
+          padding: 14px;
+          background: rgba(255,255,255,0.02);
+          border-radius: 0 0 10px 10px;
+          border: 1px solid rgba(255,255,255,0.06);
+          border-top: none;
+        }
+
+        .mn-cal-header {
+          background: rgba(255,255,255,0.04);
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .mn-cal-nav {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 8px;
+          padding: 6px;
+          cursor: pointer;
+          color: #94A3B8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .mn-cal-nav:hover { background: rgba(37,99,235,0.2); color: white; }
+
+        .mn-cal-day-header {
+          background: rgba(255,255,255,0.03);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .mn-logo-preview {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 12px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .mn-file-input {
+          display: block;
+          width: 100%;
+          font-size: 13px;
+          color: #94A3B8;
+          font-family: 'DM Sans', sans-serif;
+          background: #0F2438;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          padding: 10px;
+          cursor: pointer;
+          box-sizing: border-box;
+        }
+        .mn-file-input::-webkit-file-upload-button {
+          background: rgba(37,99,235,0.2);
+          color: #93C5FD;
+          border: 1px solid rgba(37,99,235,0.3);
+          border-radius: 6px;
+          padding: 4px 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          margin-right: 10px;
+        }
+
+        .mn-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.75);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 50;
+          padding: 16px;
+        }
+        .mn-modal {
+          background: #1E3A5C;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 20px;
+          padding: 28px;
+          width: 100%;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+        }
+        .mn-modal-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 20px;
+          font-weight: 800;
+          color: white;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+
+        .mn-pass-field {
+          position: relative;
+        }
+        .mn-pass-field input {
+          padding-right: 40px;
+        }
+        .mn-pass-toggle {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #64748B;
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+        }
+        .mn-pass-toggle:hover { color: #94A3B8; }
+
+        .mn-conflict-item {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 14px;
+          transition: background 0.2s;
+        }
+        .mn-conflict-item:hover { background: rgba(255,255,255,0.07); }
+
+        .mn-badge-pending {
+          background: rgba(251,191,36,0.15);
+          color: #FBBF24;
+          border: 1px solid rgba(251,191,36,0.3);
+          padding: 3px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .mn-warning-box {
+          background: rgba(249,115,22,0.1);
+          border-left: 3px solid #F97316;
+          border-radius: 8px;
+          padding: 14px;
+          margin-bottom: 16px;
+        }
+
+        @media (max-width: 640px) {
+          .mn-grid-2 { grid-template-columns: 1fr !important; }
+          .mn-flex-wrap { flex-wrap: wrap; }
+          .mn-btn-full { width: 100%; justify-content: center; }
+        }
+      `}</style>
+
+      {/* ── Título ── */}
+      <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 800, color: 'white', textAlign: 'center', marginBottom: 20 }}>
         Mi Negocio
       </h1>
 
-      {/* Tarjetas de Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 rounded-lg text-white">
-          <div className="flex items-center justify-between">
+      {/* ── Tarjetas estadísticas ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }} className="mn-grid-2">
+        <div style={{ background: 'linear-gradient(135deg, #1D4ED8, #2563EB)', padding: 16, borderRadius: 14, color: 'white', border: '1px solid rgba(56,189,248,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p className="text-sm opacity-90">Plan Actual</p>
-              <p className="text-2xl font-bold capitalize">{cliente?.plan || 'Sin plan'}</p>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Plan Actual</p>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, textTransform: 'capitalize' }}>{cliente?.plan || 'Sin plan'}</p>
             </div>
-            <TrendingUp className="text-white opacity-80" size={24} />
+            <TrendingUp size={22} style={{ opacity: 0.8 }} />
           </div>
         </div>
-
-        <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 rounded-lg text-white">
-          <div className="flex items-center justify-between">
+        <div style={{ background: 'linear-gradient(135deg, #059669, #10B981)', padding: 16, borderRadius: 14, color: 'white' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p className="text-sm opacity-90">Días Disponibles</p>
-              <p className="text-2xl font-bold">{diasDisponibles}/7</p>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Días Disponibles</p>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800 }}>{diasDisponibles}/7</p>
             </div>
-            <Calendar className="text-white opacity-80" size={24} />
+            <Calendar size={22} style={{ opacity: 0.8 }} />
           </div>
         </div>
-
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-4 rounded-lg text-white">
-          <div className="flex items-center justify-between">
+        <div style={{ background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)', padding: 16, borderRadius: 14, color: 'white' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p className="text-sm opacity-90">Horas Semanales</p>
-              <p className="text-2xl font-bold">{totalHorasSemanales.toFixed(0)}h</p>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Horas Semanales</p>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800 }}>{totalHorasSemanales.toFixed(0)}h</p>
             </div>
-            <Clock className="text-white opacity-80" size={24} />
+            <Clock size={22} style={{ opacity: 0.8 }} />
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Cargando información del negocio...</p>
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+          <div style={{ width: 32, height: 32, border: '3px solid rgba(37,99,235,0.2)', borderTop: '3px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 14 }}>Cargando información del negocio...</p>
         </div>
       ) : (
         <>
-          {/* Mensajes */}
+          {/* ── Mensaje éxito ── */}
           <AnimatePresence>
             {mensajeVisible && (
               <motion.div
-                className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md"
+                style={{ marginBottom: 16, padding: '14px 18px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12 }}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <p className="text-green-700 text-lg font-medium">✅ Cambios guardados correctamente.</p>
+                <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#6EE7B7', fontSize: 14, fontWeight: 600 }}>✅ Cambios guardados correctamente.</p>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Información básica */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Store size={20} />
+          {/* ── Información básica ── */}
+          <div className="mn-card">
+            <h2 className="mn-section-title">
+              <Store size={18} color="#60A5FA" />
               Información del Negocio
             </h2>
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Nombre del negocio:</label>
-                <div className="relative">
-                  <Store className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" size={18} />
-                  <input 
-                    type="text" 
-                    value={nombre} 
-                    disabled 
-                    className="pl-8 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-gray-100"
-                  />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }} className="mn-grid-2">
+              <div>
+                <label className="mn-label">Nombre del negocio:</label>
+                <div className="mn-input-icon">
+                  <Store size={16} />
+                  <input type="text" value={nombre} disabled className="mn-input" />
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Correo:</label>
-                <div className="relative">
-                  <Globe className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" size={18} />
-                  <input 
-                    type="email" 
-                    value={correo} 
-                    disabled 
-                    className="pl-8 pr-2 py-2 border border-gray-300 rounded-md w-full text-sm text-gray-800 bg-gray-100"
-                  />
+              <div>
+                <label className="mn-label">Correo:</label>
+                <div className="mn-input-icon">
+                  <Globe size={16} />
+                  <input type="email" value={correo} disabled className="mn-input" />
                 </div>
               </div>
             </div>
 
-            {/* Botón Cambiar Contraseña - Fuera del grid */}
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setModalAbierto(true)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition flex items-center gap-2"
-              >
-                <Lock size={18} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              <button onClick={() => setModalAbierto(true)} className="mn-btn-dark">
+                <Lock size={16} />
                 Cambiar Contraseña
               </button>
             </div>
 
-            {/* SECCIÓN DE LOGO ACTUALIZADA */}
-            <div className="flex flex-col gap-2 mb-4">
-              <label className="text-sm font-medium text-gray-700">Logo del negocio (opcional):</label>
-              <div className="flex flex-col gap-3">
-                {/* Mostrar logo actual si existe */}
+            <div className="mn-divider" />
+
+            {/* Logo */}
+            <div style={{ marginBottom: 16 }}>
+              <label className="mn-label">Logo del negocio (opcional):</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {cliente?.logo_url && (
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                    <img 
-                      src={cliente.logo_url} 
-                      alt="Logo actual" 
-                      className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
-                    />
+                  <div className="mn-logo-preview">
+                    <img src={cliente.logo_url} alt="Logo actual" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Logo actual</span>
-                      <p className="text-xs text-gray-500">Se muestra en tu página de reservas</p>
+                      <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: 'white', fontSize: 13 }}>Logo actual</p>
+                      <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 12 }}>Se muestra en tu página de reservas</p>
                     </div>
                   </div>
                 )}
-                
-                {/* Input para subir nuevo logo */}
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={subirLogo}
-                    disabled={subiendoLogo}
-                    className="block w-full text-sm text-gray-500
-                              file:mr-4 file:py-2 file:px-4
-                              file:rounded-lg file:border-0
-                              file:text-sm file:font-semibold
-                              file:bg-blue-50 file:text-blue-700
-                              hover:file:bg-blue-100
-                              cursor-pointer border border-gray-300 rounded-lg p-2
-                              disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
+                <div style={{ position: 'relative' }}>
+                  <input type="file" accept="image/*" onChange={subirLogo} disabled={subiendoLogo} className="mn-file-input" />
                   {subiendoLogo ? (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>
+                      <div style={{ width: 16, height: 16, border: '2px solid rgba(37,99,235,0.3)', borderTop: '2px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     </div>
                   ) : (
-                    <Upload className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                    <Upload size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#475569' }}>
                   📎 Formatos: JPG, PNG, SVG • Tamaño máximo: 1MB • Recomendado: 200x200px mínimo
                 </p>
-                {subiendoLogo && (
-                  <p className="text-sm text-blue-600 animate-pulse">
-                    Subiendo logo...
-                  </p>
-                )}
+                {subiendoLogo && <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#60A5FA' }}>Subiendo logo...</p>}
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Plan y link para citas:</label>
-              <div className="flex flex-col md:flex-row md:items-center gap-2">
-                <input
-                  type="text"
-                  value={cliente?.plan || "Sin plan"}
-                  disabled
-                  className="border border-gray-300 rounded-lg p-2 bg-gray-100 font-semibold text-blue-600 w-full md:w-auto"
-                />
+            <div className="mn-divider" />
+
+            {/* Plan y link */}
+            <div>
+              <label className="mn-label">Plan y link para citas:</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+                <input type="text" value={cliente?.plan || "Sin plan"} disabled className="mn-input" style={{ width: 'auto', minWidth: 120 }} />
                 {cliente?.slug && (
-                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                    <a
-                      href={`/reservar/${cliente.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-1 w-full sm:w-auto"
-                    >
-                      <Link2 size={16} />
-                      Página
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <a href={`/reservar/${cliente.slug}`} target="_blank" rel="noopener noreferrer" className="mn-btn-primary" style={{ background: '#059669', boxShadow: '0 4px 16px rgba(5,150,105,0.3)' }}>
+                      <Link2 size={14} /> Link para citas
                     </a>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          `${window.location.origin}/reservar/${cliente.slug}`
-                        );
-                        toast.success("✅ Link copiado");
-                      }}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-1 w-full sm:w-auto"
-                    >
-                      <Copy size={16} />
-                      Copiar
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/reservar/${cliente.slug}`); toast.success("✅ Link copiado"); }} className="mn-btn-primary">
+                      <Copy size={14} /> Copiar link para citas
                     </button>
-                    <button
-                      onClick={() => window.location.href = '/planes'}
-                      className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-1 w-full sm:w-auto"
-                    >
-                      <CreditCard size={16} />
-                      Pagar Suscripción
+                    <button onClick={() => window.location.href = '/planes'} className="mn-btn-primary" style={{ background: '#7C3AED', boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>
+                      <CreditCard size={14} /> Pagar Suscripción
                     </button>
                   </div>
                 )}
@@ -838,69 +804,47 @@ export default function MiNegocioPage() {
             </div>
           </div>
 
-          {/* Configuración de horarios */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Clock size={20} />
+          {/* ── Horarios ── */}
+          <div className="mn-card">
+            <h2 className="mn-section-title">
+              <Clock size={18} color="#38BDF8" />
               Horarios de Atención
             </h2>
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Hora de inicio:</label>
-                <input 
-                  type="time" 
-                  value={rangoInicio} 
-                  onChange={(e) => setRangoInicio(e.target.value)} 
-                  className="p-2 border border-gray-300 rounded-md text-gray-800"
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }} className="mn-grid-2">
+              <div>
+                <label className="mn-label">Hora de inicio:</label>
+                <input type="time" value={rangoInicio} onChange={(e) => setRangoInicio(e.target.value)} className="mn-input" />
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Hora de fin:</label>
-                <input 
-                  type="time" 
-                  value={rangoFin} 
-                  onChange={(e) => setRangoFin(e.target.value)} 
-                  className="p-2 border border-gray-300 rounded-md text-gray-800"
-                />
+              <div>
+                <label className="mn-label">Hora de fin:</label>
+                <input type="time" value={rangoFin} onChange={(e) => setRangoFin(e.target.value)} className="mn-input" />
               </div>
             </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Intervalo entre citas (minutos):</label>
-              <input
-                type="number"
-                value={intervalo}
-                onChange={(e) => setIntervalo(Number(e.target.value))}
-                className="p-2 border border-gray-300 rounded-md text-gray-800"
-                min={5}
-              />
-              {intervaloInvalido && (
-                <p className="text-red-600 text-sm mt-1">El intervalo debe ser un número mayor o igual a 5 minutos.</p>
-              )}
+            <div>
+              <label className="mn-label">Intervalo entre citas (minutos):</label>
+              <input type="number" value={intervalo} onChange={(e) => setIntervalo(Number(e.target.value))} className="mn-input" min={5} style={{ maxWidth: 200 }} />
+              {intervaloInvalido && <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#FCA5A5', fontSize: 13, marginTop: 6 }}>El intervalo debe ser un número mayor o igual a 5 minutos.</p>}
             </div>
           </div>
 
-          {/* Días no disponibles */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Calendar size={20} />
+          {/* ── Días no disponibles ── */}
+          <div className="mn-card">
+            <h2 className="mn-section-title">
+              <Calendar size={18} color="#F472B6" />
               Días no Disponibles
             </h2>
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {diasSemana.map((dia) => (
                 <button
                   key={dia}
                   type="button"
-                  onClick={() =>
-                    setDiasNoDisponibles((prev) =>
-                      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
-                    )
-                  }
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200 capitalize ${
-                    diasNoDisponibles.includes(dia)
-                      ? 'bg-red-500 text-white border-red-500 hover:bg-red-600'
-                      : 'bg-green-500 text-white border-green-500 hover:bg-green-600'
-                  }`}
+                  onClick={() => setDiasNoDisponibles((prev) => prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia])}
+                  className="mn-dia-btn"
+                  style={{
+                    background: diasNoDisponibles.includes(dia) ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.15)',
+                    color: diasNoDisponibles.includes(dia) ? '#FCA5A5' : '#6EE7B7',
+                    border: `1px solid ${diasNoDisponibles.includes(dia) ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                  }}
                 >
                   {dia}
                 </button>
@@ -908,378 +852,263 @@ export default function MiNegocioPage() {
             </div>
           </div>
 
-          {/* Horas no disponibles */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Settings size={20} />
+          {/* ── Horas no disponibles ── */}
+          <div className="mn-card">
+            <h2 className="mn-section-title">
+              <Settings size={18} color="#A78BFA" />
               Horas no Disponibles por Día
             </h2>
-            <div className="space-y-3">
-              {diasSemana
-                .filter((dia) => !diasNoDisponibles.includes(dia))
-                .map((dia) => (
-                  <div key={dia} className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleDia(dia)}
-                      className="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <span className="capitalize font-medium text-gray-800">{dia}</span>
-                      <span className="text-gray-600">{diasAbiertos[dia] ? '▲' : '▼'}</span>
-                    </button>
-
-                    {diasAbiertos[dia] && (
-                      <div className="p-4 bg-white">
-                        <div className="flex flex-wrap gap-2">
-                          {bloques[dia]?.map((hora) => (
-                            <button
-                              key={hora}
-                              type="button"
-                              onClick={() => toggleHora(dia, hora)}
-                              className={`px-3 py-2 text-sm rounded-lg border transition-all duration-200 font-medium ${
-                                horasNoDisponibles[dia]?.includes(hora)
-                                  ? 'bg-red-500 text-white border-red-500 hover:bg-red-600'
-                                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                              }`}
-                            >
-                              {hora}
-                            </button>
-                          ))}
-                        </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {diasSemana.filter((dia) => !diasNoDisponibles.includes(dia)).map((dia) => (
+                <div key={dia} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <button type="button" onClick={() => toggleDia(dia)} className="mn-acord-header">
+                    <span>{dia}</span>
+                    <span style={{ fontSize: 11, color: '#64748B' }}>{diasAbiertos[dia] ? '▲' : '▼'}</span>
+                  </button>
+                  {diasAbiertos[dia] && (
+                    <div className="mn-acord-body">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {bloques[dia]?.map((hora) => (
+                          <button
+                            key={hora}
+                            type="button"
+                            onClick={() => toggleHora(dia, hora)}
+                            className={`mn-hora-btn ${horasNoDisponibles[dia]?.includes(hora) ? 'mn-hora-bloqueada' : 'mn-hora-disponible'}`}
+                          >
+                            {hora}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Calendario de días bloqueados específicos */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Calendar size={20} />
+          {/* ── Calendario días bloqueados ── */}
+          <div className="mn-card">
+            <h2 className="mn-section-title">
+              <Calendar size={18} color="#FBBF24" />
               Bloquear Días Específicos
             </h2>
-            
-            <p className="text-sm text-gray-600 mb-4">
+            <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 13, marginBottom: 16 }}>
               Selecciona días específicos del calendario para bloquearlos. Esto es independiente del bloqueo por día de la semana.
             </p>
 
             {cargandoDiasBloqueados ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-sm text-gray-600">Cargando calendario...</p>
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                <div style={{ width: 24, height: 24, border: '2px solid rgba(37,99,235,0.2)', borderTop: '2px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 8px' }} />
+                <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 13 }}>Cargando calendario...</p>
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                {/* Header del calendario */}
-                <div className="bg-gray-50 p-3 flex items-center justify-between border-b">
-                  <button
-                    onClick={() => cambiarMes(-1)}
-                    className="p-2 hover:bg-gray-200 rounded-lg transition"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  
-                  <h3 className="font-semibold text-gray-800">
+              <div style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden' }}>
+                {/* Header calendario */}
+                <div className="mn-cal-header">
+                  <button onClick={() => cambiarMes(-1)} className="mn-cal-nav"><ChevronLeft size={18} /></button>
+                  <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'white', fontSize: 15 }}>
                     {mesActual.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}
                   </h3>
-                  
-                  <button
-                    onClick={() => cambiarMes(1)}
-                    className="p-2 hover:bg-gray-200 rounded-lg transition"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
+                  <button onClick={() => cambiarMes(1)} className="mn-cal-nav"><ChevronRight size={18} /></button>
                 </div>
 
-                {/* Días de la semana */}
-                <div className="grid grid-cols-7 bg-gray-100 border-b">
+                {/* Días semana */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }} className="mn-cal-day-header">
                   {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((dia, i) => (
-                    <div key={i} className="p-2 text-center text-sm font-semibold text-gray-600">
-                      {dia}
-                    </div>
+                    <div key={i} style={{ padding: '8px 4px', textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#64748B' }}>{dia}</div>
                   ))}
                 </div>
 
                 {/* Días del mes */}
-                <div className="grid grid-cols-7">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                   {generarDiasDelMes().map((fecha, index) => {
-                      if (!fecha) {
-                        return <div key={`empty-${index}`} className="p-2 border-b border-r"></div>;
-                      }
-
-                      const fechaStr = formatearFecha(fecha);
-                      const estaBloqueado = diasBloqueadosEspecificos.includes(fechaStr);
-                      const esPasado = esDiaPasado(fecha);
-                      
-                      // NUEVO: Verificar si el día de la semana está bloqueado
-                      const diasSemanaMap = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-                      const diaSemana = diasSemanaMap[fecha.getDay()];
-                      const diaSemanaBloqueado = diasNoDisponibles.includes(diaSemana);
-
-                      return (
-                        <button
-                          key={fechaStr}
-                          onClick={() => !esPasado && !diaSemanaBloqueado && toggleDiaBloqueado(fechaStr)}
-                          disabled={esPasado || diaSemanaBloqueado}
-                          className={`p-2 border-b border-r text-sm min-h-[3rem] transition-colors ${
-                            esPasado
-                              ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                              : estaBloqueado || diaSemanaBloqueado
-                              ? 'bg-red-500 text-white hover:bg-red-600 font-semibold cursor-not-allowed'
-                              : 'hover:bg-blue-50 text-gray-700'
-                          }`}
-                          title={diaSemanaBloqueado ? `${diaSemana} está bloqueado por día de la semana` : ''}
-                        >
-                          {fecha.getDate()}
-                        </button>
-                      );
-                    })}
+                    if (!fecha) return <div key={`empty-${index}`} style={{ padding: 8, borderBottom: '1px solid rgba(255,255,255,0.04)', borderRight: '1px solid rgba(255,255,255,0.04)' }} />;
+                    const fechaStr = formatearFecha(fecha);
+                    const estaBloqueado = diasBloqueadosEspecificos.includes(fechaStr);
+                    const esPasado = esDiaPasado(fecha);
+                    const diasSemanaMap = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+                    const diaSemana = diasSemanaMap[fecha.getDay()];
+                    const diaSemanaBloqueado = diasNoDisponibles.includes(diaSemana);
+                    return (
+                      <button
+                        key={fechaStr}
+                        onClick={() => !esPasado && !diaSemanaBloqueado && toggleDiaBloqueado(fechaStr)}
+                        disabled={esPasado || diaSemanaBloqueado}
+                        title={diaSemanaBloqueado ? `${diaSemana} está bloqueado` : ''}
+                        style={{
+                          padding: '8px 4px',
+                          minHeight: 44,
+                          border: 'none',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                          borderRight: '1px solid rgba(255,255,255,0.04)',
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: 13,
+                          fontWeight: estaBloqueado ? 700 : 400,
+                          cursor: esPasado || diaSemanaBloqueado ? 'not-allowed' : 'pointer',
+                          transition: 'background 0.15s',
+                          background: esPasado
+                            ? 'rgba(255,255,255,0.02)'
+                            : estaBloqueado || diaSemanaBloqueado
+                            ? '#DC2626'
+                            : 'transparent',
+                          color: esPasado
+                            ? '#334155'
+                            : estaBloqueado || diaSemanaBloqueado
+                            ? 'white'
+                            : '#CBD5E1',
+                        }}
+                      >
+                        {fecha.getDate()}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Leyenda */}
-                <div className="bg-gray-50 p-3 border-t flex flex-wrap gap-4 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-red-500 rounded"></div>
-                    <span>Bloqueado</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-white border rounded"></div>
-                    <span>Disponible</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
-                    <span>Día pasado</span>
-                  </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                  {[
+                    { color: '#DC2626', border: '#DC2626', label: 'Bloqueado' },
+                    { color: 'transparent', border: 'rgba(255,255,255,0.1)', label: 'Disponible' },
+                    { color: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.06)', label: 'Día pasado' },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 14, height: 14, background: item.color, border: `1px solid ${item.border}`, borderRadius: 4 }} />
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#64748B' }}>{item.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
           </div>
-          
 
+          {/* ── Botón guardar ── */}
           <button
             onClick={handleGuardar}
             disabled={guardando}
-            className="w-full py-3 rounded-lg font-semibold transition-colors bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mn-btn-primary"
+            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 16, borderRadius: 12, marginBottom: 24 }}
           >
-            {guardando ? 'Guardando...' : 'Guardar cambios'}
+            {guardando ? (
+              <>
+                <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                Guardando...
+              </>
+            ) : 'Guardar cambios'}
           </button>
         </>
       )}
 
-      {/* Modal de cambio de contraseña */}
-        {modalAbierto && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-lg p-6 max-w-md w-full"
-            >
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Lock size={22} />
-                Cambiar Contraseña
-              </h3>
+      {/* ── Modal cambiar contraseña ── */}
+      {modalAbierto && (
+        <div className="mn-modal-overlay">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mn-modal" style={{ maxWidth: 440 }}>
+            <h3 className="mn-modal-title">
+              <Lock size={20} color="#60A5FA" />
+              Cambiar Contraseña
+            </h3>
 
-              <div className="space-y-4">
-                {/* Contraseña actual */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contraseña actual
-                  </label>
-                  <div className="relative">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { label: 'Contraseña actual', value: contrasenaActual, setter: setContrasenaActual, mostrar: mostrarActual, toggleMostrar: () => setMostrarActual(!mostrarActual) },
+                { label: 'Nueva contraseña', value: contrasenaNueva, setter: setContrasenaNueva, mostrar: mostrarNueva, toggleMostrar: () => setMostrarNueva(!mostrarNueva), hint: 'Mínimo 6 caracteres' },
+                { label: 'Confirmar nueva contraseña', value: contrasenaConfirmar, setter: setContrasenaConfirmar, mostrar: mostrarConfirmar, toggleMostrar: () => setMostrarConfirmar(!mostrarConfirmar) },
+              ].map((field) => (
+                <div key={field.label}>
+                  <label className="mn-label">{field.label}</label>
+                  <div className="mn-pass-field">
                     <input
-                      type={mostrarActual ? "text" : "password"}
-                      value={contrasenaActual}
-                      onChange={(e) => setContrasenaActual(e.target.value)}
-                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
+                      type={field.mostrar ? "text" : "password"}
+                      value={field.value}
+                      onChange={(e) => field.setter(e.target.value)}
+                      className="mn-input"
                       placeholder="••••••••"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setMostrarActual(!mostrarActual)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                    >
-                      {mostrarActual ? <EyeOff size={18} /> : <Eye size={18} />}
+                    <button type="button" onClick={field.toggleMostrar} className="mn-pass-toggle">
+                      {field.mostrar ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {field.hint && <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#475569', marginTop: 4 }}>{field.hint}</p>}
                 </div>
+              ))}
+            </div>
 
-                {/* Nueva contraseña */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nueva contraseña
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={mostrarNueva ? "text" : "password"}
-                      value={contrasenaNueva}
-                      onChange={(e) => setContrasenaNueva(e.target.value)}
-                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setMostrarNueva(!mostrarNueva)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                    >
-                      {mostrarNueva ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
-                </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setModalAbierto(false); setContrasenaActual(''); setContrasenaNueva(''); setContrasenaConfirmar(''); }} disabled={cambiandoContrasena} className="mn-btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>
+                Cancelar
+              </button>
+              <button onClick={handleCambiarContrasena} disabled={cambiandoContrasena} className="mn-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                {cambiandoContrasena ? (
+                  <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Cambiando...</>
+                ) : 'Cambiar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
-                {/* Confirmar contraseña */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirmar nueva contraseña
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={mostrarConfirmar ? "text" : "password"}
-                      value={contrasenaConfirmar}
-                      onChange={(e) => setContrasenaConfirmar(e.target.value)}
-                      className="w-full p-2 pr-10 border border-gray-300 rounded-lg"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setMostrarConfirmar(!mostrarConfirmar)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                    >
-                      {mostrarConfirmar ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
+      {/* ── Modal conflicto horarios ── */}
+      {modalConflicto.visible && (
+        <div className="mn-modal-overlay">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mn-modal" style={{ maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+              <div style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)', padding: 10, borderRadius: '50%', flexShrink: 0 }}>
+                <Calendar size={22} color="#FB923C" />
               </div>
-
-              {/* Botones del modal */}
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setModalAbierto(false);
-                    setContrasenaActual('');
-                    setContrasenaNueva('');
-                    setContrasenaConfirmar('');
-                  }}
-                  disabled={cambiandoContrasena}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleCambiarContrasena}
-                  disabled={cambiandoContrasena}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {cambiandoContrasena ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Cambiando...
-                    </>
-                  ) : (
-                    'Cambiar'
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-      {/* Modal de conflicto de horarios */}
-        {modalConflicto.visible && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-start gap-3 mb-4">
-                <div className="bg-orange-100 p-2 rounded-full flex-shrink-0">
-                  <Calendar className="text-orange-600" size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">
-                    ⚠️ No se puede guardar - Tienes citas programadas
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Los cambios que intentas hacer afectan {modalConflicto.citas.length} cita{modalConflicto.citas.length !== 1 ? 's' : ''} pendiente{modalConflicto.citas.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
-                <p className="text-sm text-gray-800">
-                  <strong>Importante:</strong> Debes gestionar estas citas antes de poder cambiar tu disponibilidad. 
-                  Ve a la página de Reservas para reprogramarlas o marcarlas como incumplidas.
+              <div>
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, color: 'white', marginBottom: 4 }}>
+                  ⚠️ No se puede guardar — Tienes citas programadas
+                </h3>
+                <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#94A3B8', fontSize: 13 }}>
+                  Los cambios afectan {modalConflicto.citas.length} cita{modalConflicto.citas.length !== 1 ? 's' : ''} pendiente{modalConflicto.citas.length !== 1 ? 's' : ''}
                 </p>
               </div>
+            </div>
 
-              {/* Lista de citas afectadas */}
-              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
-                <h4 className="font-semibold text-gray-800 sticky top-0 bg-white pb-2">
-                  Citas que debes gestionar:
-                </h4>
-                {modalConflicto.citas.map((cita, index) => (
-                  <div 
-                    key={cita.id} 
-                    className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900">
-                          {cita.nombre}
-                        </p>
-                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
-                          <span className="flex items-center gap-1">
-                            <Calendar size={14} />
-                            {new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-CO', {
-                              weekday: 'long',
-                              day: 'numeric',
-                              month: 'long'
-                            })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={14} />
-                            {cita.hora}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          📞 {cita.telefono}
-                        </p>
+            <div className="mn-warning-box">
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#CBD5E1', lineHeight: 1.6 }}>
+                <strong style={{ color: '#FB923C' }}>Importante:</strong> Debes gestionar estas citas antes de poder cambiar tu disponibilidad. Ve a la página de Reservas para reprogramarlas o marcarlas como incumplidas.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, maxHeight: 320, overflowY: 'auto' }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'white', fontSize: 14, marginBottom: 4 }}>Citas que debes gestionar:</p>
+              {modalConflicto.citas.map((cita) => (
+                <div key={cita.id} className="mn-conflict-item">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, color: 'white', fontSize: 14, marginBottom: 6 }}>{cita.nombre}</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Calendar size={12} />
+                          {new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </span>
+                        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Clock size={12} />
+                          {cita.hora}
+                        </span>
                       </div>
-                      <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded">
-                        Pendiente
-                      </span>
+                      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#64748B', marginTop: 4 }}>📞 {cita.telefono}</p>
                     </div>
+                    <span className="mn-badge-pending">Pendiente</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
 
-              {/* Botones del modal */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => setModalConflicto({ visible: false, citas: [] })}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Volver
-                </button>
-                <button
-                  onClick={() => {
-                    setModalConflicto({ visible: false, citas: [] });
-                    window.location.href = '/dashboard-cliente/reservas';  //
-                  }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                >
-                  <Calendar size={18} />
-                  Ir a gestionar reservas
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button onClick={() => setModalConflicto({ visible: false, citas: [] })} className="mn-btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>
+                Volver
+              </button>
+              <button onClick={() => { setModalConflicto({ visible: false, citas: [] }); window.location.href = '/dashboard-cliente/reservas'; }} className="mn-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                <Calendar size={16} />
+                Ir a gestionar reservas
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
     </motion.div>
-    
   );
 }
 

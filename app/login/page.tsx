@@ -43,59 +43,55 @@ export default function LoginPage() {
   // Función para calcular días hasta vencimiento (Compatible con DATE)
   const calcularDiasParaVencer = (fechaVencimiento) => {
     if (!fechaVencimiento) return null
-    
-    // Obtener fecha actual (solo fecha, sin hora) - Compatible con DATE de BD
-    const hoy = new Date().toISOString().split('T')[0] // '2025-10-29'
-    
-    // fechaVencimiento ya viene como DATE desde BD: '2025-10-30'
+    const ahora = new Date()
+    const año = ahora.getFullYear()
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0')
+    const dia = String(ahora.getDate()).padStart(2, '0')
+    const hoy = `${año}-${mes}-${dia}`
     const fechaVenc = fechaVencimiento
-    
-    // Convertir ambas a Date para calcular diferencia
     const fecha1 = new Date(hoy + 'T00:00:00')
     const fecha2 = new Date(fechaVenc + 'T00:00:00')
-    
-    // Calcular diferencia en días
     const diffTime = fecha2.getTime() - fecha1.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
     return diffDays
   }
 
   const verificarVencimientoSuscripcion = async (cliente: any) => {
-      // Solo verificar si tiene suscripción activa
-      if (!cliente.suscripcion_activa || !cliente.fecha_vencimiento_plan) {
-        return cliente;
-      }
-
-      const ahora = new Date();
-      const fechaVencimiento = new Date(cliente.fecha_vencimiento_plan);
-
-      // Si la suscripción ha vencido
-      if (ahora > fechaVencimiento) {
-        console.log(`Suscripción vencida para ${cliente.correo}. Vencimiento: ${fechaVencimiento}`);
-        
-        // Cambiar estado a Inactivo
-        await supabase
-          .from('clientes')
-          .update({
-            activo: 'Inactivo',
-            suscripcion_activa: false,
-            fecha_cambio_estado: new Date().toISOString()
-          })
-          .eq('correo', cliente.correo);
-        
-        return { 
-          ...cliente, 
-          activo: 'Inactivo', 
-          suscripcion_activa: false 
-        };
-      }
-
+    if (!cliente.suscripcion_activa || !cliente.fecha_vencimiento_plan) {
       return cliente;
-    };
+    }
 
-  // Función para verificar y actualizar estado del cliente
-    const verificarEstadoCliente = async (email: string) => {
+    const ahora = new Date()
+    const año = ahora.getFullYear()
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0')
+    const dia = String(ahora.getDate()).padStart(2, '0')
+    const hoyStr = `${año}-${mes}-${dia}`
+
+    const fechaVencStr = String(cliente.fecha_vencimiento_plan).substring(0, 10)
+
+    if (hoyStr > fechaVencStr) {
+      console.log(`Suscripción vencida para ${cliente.correo}. Vencimiento: ${fechaVencStr}`)
+
+      await supabase
+        .from('clientes')
+        .update({
+          activo: 'Inactivo',
+          suscripcion_activa: false,
+          fecha_cambio_estado: new Date().toISOString()
+        })
+        .eq('correo', cliente.correo)
+
+      return {
+        ...cliente,
+        activo: 'Inactivo',
+        suscripcion_activa: false
+      }
+    }
+
+    return cliente;
+  }
+
+  const verificarEstadoCliente = async (email: string) => {
       const { data: cliente, error } = await supabase
         .from('clientes')
         .select('*')
@@ -109,10 +105,8 @@ export default function LoginPage() {
       const diasTranscurridos = calcularDiasTranscurridos(cliente.created_at)
       const diasRestantes = Math.max(0, 15 - diasTranscurridos)
 
-      // Primero verificar vencimiento de suscripción pagada
       let clienteActualizado = await verificarVencimientoSuscripcion(cliente);
 
-      // Luego verificar trial solo si no tiene suscripción activa
       if (diasTranscurridos >= 15 && clienteActualizado.activo === 'Activo' && !clienteActualizado.suscripcion_activa) {
         await supabase
           .from('clientes')
@@ -128,14 +122,12 @@ export default function LoginPage() {
       return { ...clienteActualizado, diasRestantes }
     }
 
-  // Función para proceder al dashboard después del modal
   const procederAlDashboard = () => {
     setMostrarModalAdvertencia(false)
     router.push('/dashboard-cliente')
     setLoading(false)
   }
 
-  // Función para ir a renovar plan
   const irARenovarPlan = () => {
     setMostrarModalAdvertencia(false)
     router.push('/planes')
@@ -147,10 +139,9 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     setTrialExpirado(false)
-    setSuscripcionVencida(false) // Reset del nuevo estado
+    setSuscripcionVencida(false)
 
     try {
-      // 1. Verificar credenciales
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
@@ -161,25 +152,21 @@ export default function LoginPage() {
 
       const userId = data.user.id
 
-      // 2. Verificar rol
       const { data: perfil } = await supabase
         .from('perfiles')
         .select('rol')
         .eq('user_id', userId)
         .single()
 
-      // 3. Si es superadmin, permitir acceso directo
       if (perfil?.rol === 'superadmin') {
         router.push('/admin')
         setLoading(false)
         return
       }
 
-      // 4. Si es cliente, verificar estado del trial
       if (perfil?.rol === 'cliente') {
         const cliente = await verificarEstadoCliente(email)
 
-        // Verificar estado del cliente
         if (cliente.activo === 'Eliminado') {
           setError('Esta cuenta ha sido eliminada. Contacta al soporte.')
           setLoading(false)
@@ -187,13 +174,11 @@ export default function LoginPage() {
         }
 
         if (cliente.activo === 'Inactivo') {
-          // Verificar si la inactividad es por suscripción vencida
           if (cliente.suscripcion_activa === false && cliente.fecha_vencimiento_plan) {
             setSuscripcionVencida(true)
             setLoading(false)
             return
           } else {
-            // Inactividad por otros motivos (soporte)
             setError('Tu cuenta ha sido desactivada. Contacta al soporte para más información.')
             setLoading(false)
             return
@@ -207,24 +192,19 @@ export default function LoginPage() {
           return
         }
 
-        // Si es "Activo", verificar si necesita advertencia
         if (cliente.activo === 'Activo') {
           if (cliente.suscripcion_activa && cliente.fecha_vencimiento_plan) {
-            // Usuario con suscripción pagada - verificar si necesita advertencia
             const diasHastaVencer = calcularDiasParaVencer(cliente.fecha_vencimiento_plan)
             
             if (diasHastaVencer !== null && diasHastaVencer <= 3 && diasHastaVencer > 0) {
-              // Mostrar modal de advertencia
               setDiasParaVencer(diasHastaVencer)
               setClienteParaAcceso(cliente)
               setMostrarModalAdvertencia(true)
-              return // No setear loading(false) aquí, se hace en las funciones del modal
+              return
             }
             
-            // Si no necesita advertencia, acceso directo
             router.push('/dashboard-cliente')
           } else {
-            // Usuario en trial
             setDiasRestantes(cliente.diasRestantes)
             router.push('/dashboard-cliente')
           }
@@ -232,13 +212,11 @@ export default function LoginPage() {
           return
         }
 
-        // Este caso no debería ocurrir, pero por seguridad
         setError('Estado de cuenta no válido.')
         setLoading(false)
         return
       }
 
-      // Si no tiene rol válido
       setError('Rol no válido o no definido.')
       setLoading(false)
 
@@ -275,62 +253,280 @@ export default function LoginPage() {
     }
   }
 
-  // Función para obtener el mensaje del modal según días restantes
   const obtenerMensajeModal = (dias) => {
     if (dias === 1) return 'Tu suscripción vence mañana'
     return `Tu suscripción vence en ${dias} días`
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-white flex justify-center items-center py-6">
+    <div style={{
+      minHeight: '100vh',
+      background: '#0D1B2A',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px',
+      fontFamily: 'DM Sans, sans-serif',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+
+      {/* Ambient glow fondo */}
+      <div style={{
+        position: 'absolute', top: '-100px', right: '-100px',
+        width: '500px', height: '500px',
+        background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 65%)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-100px', left: '-100px',
+        width: '400px', height: '400px',
+        background: 'radial-gradient(circle, rgba(56,189,248,0.08) 0%, transparent 65%)',
+        pointerEvents: 'none',
+      }} />
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+        .login-input {
+          width: 100%;
+          background: #0F2438;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          padding: 14px 16px;
+          color: white;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 15px;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+        .login-input::placeholder { color: #475569; }
+        .login-input:focus {
+          border-color: rgba(37,99,235,0.6);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+
+        .btn-login {
+          width: 100%;
+          background: #2563EB;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 14px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 700;
+          font-size: 16px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+        }
+        .btn-login:hover:not(:disabled) {
+          background: #1D4ED8;
+          box-shadow: 0 12px 32px rgba(37,99,235,0.50);
+          transform: translateY(-1px);
+        }
+        .btn-login:disabled {
+          background: #1E3A5F;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .btn-register {
+          background: transparent;
+          border: 1.5px solid rgba(37,99,235,0.4);
+          color: #93C5FD;
+          border-radius: 12px;
+          padding: 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 15px;
+          cursor: pointer;
+          transition: all 0.2s;
+          width: 100%;
+        }
+        .btn-register:hover {
+          background: rgba(37,99,235,0.1);
+          border-color: rgba(37,99,235,0.7);
+          color: white;
+        }
+
+        .btn-forgot {
+          background: none;
+          border: none;
+          color: #60A5FA;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          padding: 0;
+          transition: color 0.2s;
+        }
+        .btn-forgot:hover { color: #93C5FD; text-decoration: underline; }
+
+        .btn-whatsapp {
+          background: #25D366;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 20px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 auto;
+          transition: all 0.2s;
+        }
+        .btn-whatsapp:hover {
+          background: #1ebe5d;
+          transform: translateY(-1px);
+        }
+
+        .alert-trial {
+          background: rgba(239,68,68,0.1);
+          border: 1px solid rgba(239,68,68,0.3);
+          border-radius: 14px;
+          padding: 20px;
+          margin-bottom: 20px;
+        }
+        .alert-vencida {
+          background: rgba(249,115,22,0.1);
+          border: 1px solid rgba(249,115,22,0.3);
+          border-radius: 14px;
+          padding: 20px;
+          margin-bottom: 20px;
+        }
+        .alert-error {
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.25);
+          border-radius: 10px;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          color: #FCA5A5;
+          font-size: 14px;
+          text-align: center;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .btn-upgrade {
+          width: 100%;
+          background: #2563EB;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 700;
+          font-size: 14px;
+          cursor: pointer;
+          margin-top: 12px;
+          transition: all 0.2s;
+        }
+        .btn-upgrade:hover {
+          background: #1D4ED8;
+          transform: translateY(-1px);
+        }
+
+        .divider {
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+          margin: 20px 0;
+        }
+      `}</style>
+
       <motion.div
-        className="w-full max-w-md bg-white shadow-lg rounded-2xl px-6 pt-2 pb-6"
+        style={{
+          width: '100%',
+          maxWidth: 420,
+          background: '#162033',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 24,
+          padding: '0px 36px 40px 36px',
+          position: 'relative',
+          zIndex: 1,
+          boxShadow: '0 32px 80px rgba(0,0,0,0.4)',
+        }}
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
-        <motion.img
-          src="/logo_Zitapp.png"
-          alt="Zitapp Logo"
-          className="w-40 h-40 mx-auto -mt-4 mb-0"
+
+        {/* Logo */}
+        <motion.div
+          style={{ textAlign: 'center', marginBottom: -60, marginTop: -40 }}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
-        />
+        >
+          <img
+            src="/logo_Zitapp.png"
+            alt="Zitapp Logo"
+            style={{ width: 240, height: 240, margin: '0 auto', display: 'block' }}
+          />
+        </motion.div>
 
+        {/* Título */}
         <motion.h1
-          className="text-3xl font-bold text-center mb-4 text-gray-800"
+          style={{
+            fontFamily: 'Syne, sans-serif',
+            fontSize: 28,
+            fontWeight: 800,
+            color: 'white',
+            textAlign: 'center',
+            marginBottom: 8,
+          }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
         >
           Iniciar sesión
         </motion.h1>
 
+        <motion.p
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 14,
+            color: '#64748B',
+            textAlign: 'center',
+            marginBottom: 28,
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          Bienvenido de vuelta
+        </motion.p>
+
         {/* Mensaje de trial expirado */}
         {trialExpirado && (
           <motion.div
-            className="mb-4 p-4 bg-red-50 border border-red-300 rounded-lg"
+            className="alert-trial"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-red-800 mb-2">
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 17, fontWeight: 800, color: '#FCA5A5', marginBottom: 8 }}>
                 Período de Prueba Expirado
               </h3>
-              <p className="text-red-700 text-sm mb-3">
-                Tu período de prueba gratuita de 15 días ha finalizado. 
+              <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#FDA4A4', fontSize: 13, lineHeight: 1.6 }}>
+                Tu período de prueba gratuita de 15 días ha finalizado.
                 Para continuar usando Zitapp, actualiza tu plan.
               </p>
-              <button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+              <button
+                className="btn-upgrade"
                 onClick={() => {
-                  // Guardar datos del usuario antes de ir a planes
                   const userData = {
-                    email: email,  // Email del login
-                    isRenewal: true,  // Indicar que es renovación
-                    renewalType: 'trial_expired'  // O 'subscription_expired'
+                    email: email,
+                    isRenewal: true,
+                    renewalType: 'trial_expired'
                   };
                   sessionStorage.setItem('renewalData', JSON.stringify(userData));
                   router.push('/planes');
@@ -345,26 +541,25 @@ export default function LoginPage() {
         {/* Mensaje de suscripción vencida */}
         {suscripcionVencida && (
           <motion.div
-            className="mb-4 p-4 bg-orange-50 border border-orange-300 rounded-lg"
+            className="alert-vencida"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-orange-800 mb-2">
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 17, fontWeight: 800, color: '#FDB78A', marginBottom: 8 }}>
                 Suscripción Vencida
               </h3>
-              <p className="text-orange-700 text-sm mb-3">
+              <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#FDC9A4', fontSize: 13, lineHeight: 1.6 }}>
                 Tu suscripción ha expirado. Renueva tu plan para continuar usando Zitapp.
               </p>
-              <button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+              <button
+                className="btn-upgrade"
                 onClick={() => {
-                  // Guardar datos del usuario antes de ir a planes
                   const userData = {
-                    email: email,  // Email del login
-                    isRenewal: true,  // Indicar que es renovación
-                    renewalType: 'trial_expired'  // O 'subscription_expired'
+                    email: email,
+                    isRenewal: true,
+                    renewalType: 'trial_expired'
                   };
                   sessionStorage.setItem('renewalData', JSON.stringify(userData));
                   router.push('/planes');
@@ -376,31 +571,33 @@ export default function LoginPage() {
           </motion.div>
         )}
 
+        {/* Error general */}
         {error && !trialExpirado && !suscripcionVencida && (
-          <motion.p
-            className="text-sm text-red-500 text-center mb-4 border border-red-300 p-2 rounded bg-red-50"
+          <motion.div
+            className="alert-error"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.1 }}
           >
             {error}
-          </motion.p>
+          </motion.div>
         )}
 
+        {/* Formulario */}
         {!trialExpirado && !suscripcionVencida && (
           <motion.form
             onSubmit={handleLogin}
-            className="flex flex-col gap-4"
+            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.4 }}
           >
             <input
               type="email"
               placeholder="Correo electrónico"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="login-input"
               required
             />
             <input
@@ -408,16 +605,15 @@ export default function LoginPage() {
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="login-input"
               required
             />
 
-            {/* Botón de olvidaste contraseña */}
-            <div className="text-right -mt-2 mb-2">
+            <div style={{ textAlign: 'right', marginTop: -6 }}>
               <button
                 type="button"
                 onClick={() => setMostrarRecuperacion(true)}
-                className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition"
+                className="btn-forgot"
               >
                 ¿Olvidaste tu contraseña?
               </button>
@@ -426,33 +622,13 @@ export default function LoginPage() {
             <motion.button
               type="submit"
               disabled={loading}
-              whileTap={{ scale: 0.95 }}
-              className={`flex items-center justify-center gap-2 py-3 rounded-lg font-semibold transition-all ${
-                loading
-                  ? 'bg-blue-600 text-white cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+              whileTap={{ scale: 0.97 }}
+              className="btn-login"
             >
               {loading && (
-                <svg
-                  className="w-5 h-5 animate-spin text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
+                <svg className="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                 </svg>
               )}
               {loading ? 'Ingresando...' : 'Ingresar'}
@@ -460,192 +636,256 @@ export default function LoginPage() {
           </motion.form>
         )}
 
-        {/* Sección para registrarse - solo mostrar si no hay trial expirado ni suscripción vencida */}
+        {/* Registrarse */}
         {!trialExpirado && !suscripcionVencida && (
           <motion.div
-            className="mt-4 text-center"
+            style={{ marginTop: 16 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.5 }}
           >
-            <p className="text-base text-gray-700">¿No tienes una cuenta?</p>
+            <div className="divider" />
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 10 }}>
+              ¿No tienes una cuenta?
+            </p>
             <button
               onClick={() => router.push('/registro')}
-              className="mt-2 text-blue-600 text-xl font-bold hover:underline hover:text-blue-800 transition"
+              className="btn-register"
             >
               Regístrate
             </button>
           </motion.div>
         )}
 
-        {/* Botón de soporte - siempre visible */}
-          <motion.div
-            className="text-center mt-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.65 }}
-          >
-            <p className="text-sm text-gray-700 mb-3">
-              ¿Problemas para iniciar sesión?
-            </p>
-            <button 
-              onClick={() => window.open('https://wa.me/573001334528?text=Hola,%20tengo%20problemas%20para%20iniciar%20sesión%20en%20Zitapp', '_blank')}
-              className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.485"/>
-              </svg>
-              Ayuda con Login
-            </button>
-          </motion.div>
-
-        <motion.p
-          className="text-sm text-gray-500 mt-6 text-center"
+        {/* Soporte WhatsApp */}
+        <motion.div
+          style={{ textAlign: 'center', marginTop: 20 }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="divider" />
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#475569', marginBottom: 10 }}>
+            ¿Problemas para iniciar sesión?
+          </p>
+          <button
+            onClick={() => window.open('https://wa.me/573001334528?text=Hola,%20tengo%20problemas%20para%20iniciar%20sesión%20en%20Zitapp', '_blank')}
+            className="btn-whatsapp"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.485"/>
+            </svg>
+            Ayuda con Login
+          </button>
+        </motion.div>
+
+        {/* Copyright */}
+        <motion.p
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 12,
+            color: '#1E293B',
+            textAlign: 'center',
+            marginTop: 20,
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
         >
           © {new Date().getFullYear()} Zitapp — Reservas Inteligentes
         </motion.p>
       </motion.div>
-      
-      {/* Modal de Recuperación de Contraseña */}
-        {mostrarRecuperacion && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl relative"
-            >
-              {/* Botón cerrar */}
-              <button
-                onClick={() => {
-                  setMostrarRecuperacion(false)
-                  setEmailRecuperacion('')
-                  setErrorRecuperacion('')
-                  setMensajeRecuperacion('')
-                }}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
 
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                Recuperar Contraseña
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.
-              </p>
-
-              {mensajeRecuperacion && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg text-green-700 text-sm">
-                  {mensajeRecuperacion}
-                </div>
-              )}
-
-              {errorRecuperacion && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm">
-                  {errorRecuperacion}
-                </div>
-              )}
-
-              <form onSubmit={handleRecuperarPassword} className="space-y-4">
-                <input
-                  type="email"
-                  placeholder="correo@ejemplo.com"
-                  value={emailRecuperacion}
-                  onChange={(e) => setEmailRecuperacion(e.target.value)}
-                  className="w-full text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  required
-                />
-
-                <button
-                  type="submit"
-                  disabled={enviandoRecuperacion}
-                  className={`w-full py-3 rounded-lg font-semibold transition-all ${
-                    enviandoRecuperacion
-                      ? 'bg-blue-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } text-white`}
-                >
-                  {enviandoRecuperacion ? 'Enviando...' : 'Enviar Instrucciones'}
-                </button>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-
-      {/* Modal de Advertencia de Vencimiento */}
-      {mostrarModalAdvertencia && (
+      {/* ── Modal Recuperación de Contraseña ── */}
+      {mostrarRecuperacion && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 50, padding: 24,
+          }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className={`${diasParaVencer <= 1 ? 'bg-gradient-to-r from-red-500 to-orange-500 border-red-600' : diasParaVencer <= 3 ? 'bg-gradient-to-r from-orange-500 to-yellow-500 border-orange-600' : 'bg-gradient-to-r from-yellow-500 to-orange-400 border-yellow-600'} border-2 rounded-2xl p-6 max-w-md w-full shadow-2xl text-white relative overflow-hidden`}
+            style={{
+              background: '#162033',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20,
+              padding: '32px',
+              maxWidth: 420,
+              width: '100%',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+              position: 'relative',
+            }}
           >
-            {/* Patrón de fondo sutil */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
-            </div>
-            
-            <div className="relative text-center">
-              {/* Icono de advertencia */}
-              <div className="mx-auto flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full mb-4">
-                <AlertTriangle className="w-8 h-8 animate-pulse" />
+            <button
+              onClick={() => {
+                setMostrarRecuperacion(false)
+                setEmailRecuperacion('')
+                setErrorRecuperacion('')
+                setMensajeRecuperacion('')
+              }}
+              style={{
+                position: 'absolute', top: 16, right: 16,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, padding: 6,
+                cursor: 'pointer', color: '#94A3B8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s',
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, color: 'white', marginBottom: 8 }}>
+              Recuperar Contraseña
+            </h3>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+              Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.
+            </p>
+
+            {mensajeRecuperacion && (
+              <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#6EE7B7', fontSize: 14, fontFamily: 'DM Sans, sans-serif' }}>
+                {mensajeRecuperacion}
+              </div>
+            )}
+
+            {errorRecuperacion && (
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#FCA5A5', fontSize: 14, fontFamily: 'DM Sans, sans-serif' }}>
+                {errorRecuperacion}
+              </div>
+            )}
+
+            <form onSubmit={handleRecuperarPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                value={emailRecuperacion}
+                onChange={(e) => setEmailRecuperacion(e.target.value)}
+                className="login-input"
+                required
+              />
+              <button
+                type="submit"
+                disabled={enviandoRecuperacion}
+                className="btn-login"
+                style={{ opacity: enviandoRecuperacion ? 0.6 : 1 }}
+              >
+                {enviandoRecuperacion ? 'Enviando...' : 'Enviar Instrucciones'}
+              </button>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ── Modal Advertencia Vencimiento ── */}
+      {mostrarModalAdvertencia && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 50, padding: 24,
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            style={{
+              background: diasParaVencer <= 1
+                ? 'linear-gradient(135deg, #7F1D1D, #991B1B)'
+                : diasParaVencer <= 3
+                ? 'linear-gradient(135deg, #78350F, #92400E)'
+                : 'linear-gradient(135deg, #1E3A5F, #162033)',
+              border: `1px solid ${diasParaVencer <= 1 ? 'rgba(239,68,68,0.4)' : diasParaVencer <= 3 ? 'rgba(249,115,22,0.4)' : 'rgba(37,99,235,0.4)'}`,
+              borderRadius: 20,
+              padding: '32px',
+              maxWidth: 420,
+              width: '100%',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 60%)', pointerEvents: 'none' }} />
+
+            <div style={{ position: 'relative', textAlign: 'center' }}>
+              <div style={{
+                width: 60, height: 60,
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 16px',
+              }}>
+                <AlertTriangle size={28} color="white" style={{ animation: 'pulse 2s infinite' }} />
               </div>
 
-              {/* Título */}
-              <h3 className="text-2xl font-bold mb-3">
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, color: 'white', marginBottom: 10 }}>
                 ⚠️ Suscripción por Vencer
               </h3>
 
-              {/* Mensaje principal */}
-              <p className="text-xl font-semibold mb-3">
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 18, fontWeight: 600, color: 'white', marginBottom: 10 }}>
                 {obtenerMensajeModal(diasParaVencer)}
               </p>
 
-              {/* Descripción */}
-              <p className="text-white/90 mb-6 leading-relaxed">
+              <p style={{ fontFamily: 'DM Sans, sans-serif', color: 'rgba(255,255,255,0.75)', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
                 Tu suscripción está próxima a vencer. Te recomendamos renovarla ahora para evitar interrupciones en el servicio.
               </p>
 
-              {/* Información adicional */}
-              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  <span className="font-semibold">
-                    {diasParaVencer === 1 ? 'Último día disponible' : `${diasParaVencer} días restantes`}
-                  </span>
-                </div>
+              <div style={{
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 12, padding: '12px 20px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                marginBottom: 20,
+              }}>
+                <Clock size={18} color="white" />
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: 'white', fontSize: 15 }}>
+                  {diasParaVencer === 1 ? 'Último día disponible' : `${diasParaVencer} días restantes`}
+                </span>
               </div>
 
-              {/* Botones de acción */}
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button
                   onClick={irARenovarPlan}
-                  className="flex-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 border border-white/30 flex items-center justify-center gap-2"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    borderRadius: 12, padding: '13px 24px',
+                    color: 'white', fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700, fontSize: 15,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    width: '100%',
+                  }}
                 >
-                  <span>Renovar Ahora</span>
+                  Renovar Ahora
                 </button>
-                
                 <button
                   onClick={procederAlDashboard}
-                  className="flex-1 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white/90 font-semibold py-3 px-6 rounded-xl transition-all duration-200 border border-white/20"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 12, padding: '13px 24px',
+                    color: 'rgba(255,255,255,0.75)', fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 600, fontSize: 15,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    width: '100%',
+                  }}
                 >
                   Continuar
                 </button>
               </div>
 
-              {/* Texto pequeño */}
-              <p className="text-xs text-white/70 mt-4">
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 16 }}>
                 Podrás acceder normalmente hasta que expire tu suscripción
               </p>
             </div>
@@ -655,4 +895,3 @@ export default function LoginPage() {
     </div>
   )
 }
-

@@ -36,13 +36,12 @@ export default function RegistroPage() {
   const [loading, setLoading] = useState(false)
   const [plan, setPlan] = useState('')
   const [exito, setExito] = useState('')
-  const [aceptaTerminos, setAceptaTerminos] = useState(false) // 🆕 Estado para términos
+  const [aceptaTerminos, setAceptaTerminos] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
 
   // Slug generado a partir del nombre
   const slugPreview = generarSlug(nombre.trim())
@@ -73,7 +72,7 @@ export default function RegistroPage() {
       return
     }
 
-    // 🆕 Validar términos y condiciones
+    // Validar términos y condiciones
     if (!aceptaTerminos) {
       setError('Debes aceptar los términos y condiciones para continuar.')
       setLoading(false)
@@ -185,7 +184,7 @@ export default function RegistroPage() {
         tipo_negocio: tipoNegocio,
         plan,
         activo: 'Activo',
-        suscripcion_activa: false, // Trial no es suscripción pagada
+        suscripcion_activa: false,
         fecha_vencimiento_plan: fechaVencimiento.toISOString(),
       },
     ])
@@ -220,121 +219,368 @@ export default function RegistroPage() {
         router.push('/login');
       }, 5000);
   }
+
   if (!mounted) {
-        return null;
-      }
-      
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-white flex justify-center items-center py-8">
+    <div style={{
+      minHeight: '100vh',
+      background: '#0D1B2A',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '32px 24px',
+      fontFamily: 'DM Sans, sans-serif',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+
+      {/* Ambient glow fondo */}
+      <div style={{
+        position: 'absolute', top: '-100px', right: '-100px',
+        width: '500px', height: '500px',
+        background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 65%)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-100px', left: '-100px',
+        width: '400px', height: '400px',
+        background: 'radial-gradient(circle, rgba(56,189,248,0.08) 0%, transparent 65%)',
+        pointerEvents: 'none',
+      }} />
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+        .reg-input {
+          width: 100%;
+          background: #0F2438;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          padding: 14px 16px;
+          color: white;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 15px;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+        .reg-input::placeholder { color: #475569; }
+        .reg-input:focus {
+          border-color: rgba(37,99,235,0.6);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+
+        .reg-select {
+          width: 100%;
+          background: #0F2438;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          padding: 14px 16px;
+          color: white;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 15px;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+          appearance: none;
+          cursor: pointer;
+        }
+        .reg-select:focus {
+          border-color: rgba(37,99,235,0.6);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+        .reg-select option {
+          background: #0F2438;
+          color: white;
+        }
+
+        .btn-registro {
+          width: 100%;
+          background: #2563EB;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          padding: 14px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 700;
+          font-size: 16px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+        }
+        .btn-registro:hover:not(:disabled) {
+          background: #1D4ED8;
+          box-shadow: 0 12px 32px rgba(37,99,235,0.50);
+          transform: translateY(-1px);
+        }
+        .btn-registro:disabled {
+          background: #1E3A5F;
+          cursor: not-allowed;
+          box-shadow: none;
+          opacity: 0.6;
+        }
+
+        .btn-whatsapp {
+          background: #25D366;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 20px;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 auto;
+          transition: all 0.2s;
+        }
+        .btn-whatsapp:hover {
+          background: #1ebe5d;
+          transform: translateY(-1px);
+        }
+
+        .btn-login-link {
+          background: none;
+          border: none;
+          color: #60A5FA;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 700;
+          font-size: 15px;
+          cursor: pointer;
+          padding: 0;
+          transition: color 0.2s;
+        }
+        .btn-login-link:hover { color: #93C5FD; }
+
+        .alert-error {
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.25);
+          border-radius: 10px;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          color: #FCA5A5;
+          font-size: 14px;
+          text-align: center;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .slug-preview {
+          background: rgba(37,99,235,0.1);
+          border: 1px solid rgba(37,99,235,0.25);
+          border-radius: 10px;
+          padding: 10px 14px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #94A3B8;
+        }
+        .slug-preview span {
+          color: #60A5FA;
+          font-weight: 600;
+          font-family: monospace;
+        }
+
+        .terminos-box {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 14px 16px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .divider {
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+          margin: 20px 0;
+        }
+
+        .terminos-link {
+          color: #60A5FA;
+          font-weight: 600;
+          text-decoration: underline;
+          transition: color 0.2s;
+        }
+        .terminos-link:hover { color: #93C5FD; text-decoration: none; }
+      `}</style>
+
       <motion.div
-        className="w-full max-w-md bg-white shadow-lg rounded-2xl px-6 py-6"
+        style={{
+          width: '100%',
+          maxWidth: 460,
+          background: '#162033',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 24,
+          padding: '36px',
+          position: 'relative',
+          zIndex: 1,
+          boxShadow: '0 32px 80px rgba(0,0,0,0.4)',
+        }}
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
+
         {/* Logo */}
-        <motion.img
-          src="/logo_Zitapp.png"
-          alt="Zitapp Logo"
-          className="w-40 h-40 mx-auto -mt-4 mb-0"
+        <motion.div
+          style={{ textAlign: 'center', marginBottom: -60, marginTop: -80 }}
+
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
-        />
+        >
+          <img
+            src="/logo_Zitapp.png"
+            alt="Zitapp Logo"
+            style={{ width: 240, height: 240, margin: '0 auto', display: 'block' }}
 
-        <motion.h2 
-          className="text-3xl font-bold text-center text-gray-800 mb-6"
+          />
+        </motion.div>
+
+        {/* Título */}
+        <motion.h2
+          style={{
+            fontFamily: 'Syne, sans-serif',
+            fontSize: 26,
+            fontWeight: 800,
+            color: 'white',
+            textAlign: 'center',
+            marginBottom: 6,
+          }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
         >
           Crear cuenta
         </motion.h2>
 
-        {/* Mensaje de error */}
+        <motion.p
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 14,
+            color: '#64748B',
+            textAlign: 'center',
+            marginBottom: 24,
+          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          Empieza tu prueba gratuita de 15 días
+        </motion.p>
+
+        {/* Error */}
         {error && (
-          <motion.p
-            className="text-sm text-red-600 text-center mb-6 border-2 border-red-200 p-4 rounded-xl bg-red-50 font-medium"
+          <motion.div
+            className="alert-error"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.1 }}
           >
             {error}
-          </motion.p>
+          </motion.div>
         )}
 
+        {/* Modal de éxito */}
         {exito && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 50, padding: 24,
+            }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="bg-gradient-to-r from-green-500 to-blue-500 border-2 border-green-600 rounded-2xl p-6 max-w-md w-full shadow-2xl text-white relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, #1E3A5F, #162033)',
+                border: '1px solid rgba(56,189,248,0.3)',
+                borderRadius: 20,
+                padding: '32px',
+                maxWidth: 420,
+                width: '100%',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+                position: 'relative',
+                overflow: 'hidden',
+                textAlign: 'center',
+              }}
             >
-              {/* Patrón de fondo sutil */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
-              </div>
-              
-              <div className="relative text-center">
-                {/* Icono de éxito */}
-                <div className="mx-auto flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full mb-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-8 h-8 animate-pulse"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(37,99,235,0.1) 0%, transparent 60%)', pointerEvents: 'none' }} />
+
+              <div style={{ position: 'relative' }}>
+                {/* Ícono */}
+                <div style={{
+                  width: 64, height: 64,
+                  background: 'rgba(37,99,235,0.2)',
+                  border: '1px solid rgba(37,99,235,0.4)',
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 32, height: 32 }} viewBox="0 0 20 20" fill="#38BDF8">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
 
-                {/* Título */}
-                <h3 className="text-2xl font-bold mb-3">
+                <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, color: 'white', marginBottom: 8 }}>
                   🎉 Cuenta Creada con Éxito
                 </h3>
-
-                {/* Mensaje principal */}
-                <p className="text-xl font-semibold mb-3">
+                <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 17, fontWeight: 600, color: '#60A5FA', marginBottom: 12 }}>
                   ¡Bienvenido a Zitapp!
                 </p>
-
-                {/* Descripción */}
-                <p className="text-white/90 mb-6 leading-relaxed">
+                <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#94A3B8', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
                   Revisa tu correo electrónico para confirmar tu cuenta e inicia sesión para comenzar a gestionar tu negocio.
                 </p>
 
-                {/* Información adicional */}
-                <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4 mb-6">
-                  <div className="flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-semibold">
-                      Redirigiendo al login en 5 segundos
-                    </span>
-                  </div>
+                <div style={{
+                  background: 'rgba(56,189,248,0.08)',
+                  border: '1px solid rgba(56,189,248,0.2)',
+                  borderRadius: 12, padding: '12px 20px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  marginBottom: 20,
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: 18 }} viewBox="0 0 20 20" fill="#38BDF8">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: '#38BDF8', fontSize: 14 }}>
+                    Redirigiendo al login en 5 segundos
+                  </span>
                 </div>
 
-                {/* Botón de acción */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => router.push('/login')}
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-3 px-8 rounded-xl transition-all duration-200 hover:scale-105 border border-white/30 flex items-center justify-center gap-2"
-                  >
-                    <span>Ir al Login Ahora</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => router.push('/login')}
+                  style={{
+                    background: '#2563EB',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: '12px 32px',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  Ir al Login Ahora
+                </button>
 
-                {/* Texto pequeño */}
-                <p className="text-xs text-white/70 mt-4">
+                <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12, color: '#475569', marginTop: 16 }}>
                   Tu período de prueba gratuito de 15 días comienza ahora
                 </p>
               </div>
@@ -343,12 +589,12 @@ export default function RegistroPage() {
         )}
 
         {/* Formulario */}
-        <motion.form 
-          onSubmit={handleRegistro} 
-          className="flex flex-col gap-5"
+        <motion.form
+          onSubmit={handleRegistro}
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.4 }}
         >
           {/* Nombre */}
           <input
@@ -357,22 +603,20 @@ export default function RegistroPage() {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium"
+            className="reg-input"
           />
 
-          {/* Slug en tiempo real */}
+          {/* Slug preview */}
           {mounted && nombre && (
-            <motion.p 
-              className="text-sm text-gray-600 -mt-3 mb-1 bg-blue-50 p-3 rounded-lg border border-blue-200"
-              initial={{ opacity: 0, y: -10 }}
+            <motion.div
+              className="slug-preview"
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
               Tu enlace será:{' '}
-              <span className="font-mono text-blue-700 font-semibold">
-                zitapp.com/reservar/{slugPreview}
-              </span>
-            </motion.p>
+              <span>zitapp.com/reservar/{slugPreview}</span>
+            </motion.div>
           )}
 
           {/* Email */}
@@ -382,7 +626,7 @@ export default function RegistroPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium"
+            className="reg-input"
           />
 
           {/* Tipo de negocio */}
@@ -390,7 +634,7 @@ export default function RegistroPage() {
             value={tipoNegocio}
             onChange={(e) => setTipoNegocio(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium bg-white"
+            className="reg-select"
           >
             <option value="">Selecciona el tipo de negocio</option>
             <option value="barberia">Barbería</option>
@@ -399,11 +643,12 @@ export default function RegistroPage() {
             <option value="cancha">Cancha de fútbol</option>
           </select>
 
+          {/* Plan */}
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium bg-white"
+            className="reg-select"
           >
             <option value="">Selecciona un plan</option>
             <option value="basico">Plan Básico (1 Profesional)</option>
@@ -418,7 +663,7 @@ export default function RegistroPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium"
+            className="reg-input"
           />
 
           {/* Confirmar contraseña */}
@@ -428,40 +673,38 @@ export default function RegistroPage() {
             value={confirmar}
             onChange={(e) => setConfirmar(e.target.value)}
             required
-            className="text-gray-800 border-2 border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium"
+            className="reg-input"
           />
 
-          {/* 🆕 Términos y Condiciones */}
+          {/* Términos y condiciones */}
           {mounted && (
-            <motion.div 
-              className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200"
-              initial={{ opacity: 0, y: 10 }}
+            <motion.div
+              className="terminos-box"
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
+              transition={{ delay: 0.6 }}
             >
               <input
                 type="checkbox"
                 id="terminos"
                 checked={aceptaTerminos}
                 onChange={(e) => setAceptaTerminos(e.target.checked)}
-                className="mt-1 w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-all duration-200"
+                style={{
+                  marginTop: 2,
+                  width: 18, height: 18,
+                  accentColor: '#2563EB',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
                 required
               />
-              <label htmlFor="terminos" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
+              <label htmlFor="terminos" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#94A3B8', lineHeight: 1.6, cursor: 'pointer' }}>
                 He leído y acepto los{' '}
-                <Link 
-                  href="/terminos" 
-                  className="text-blue-600 hover:text-blue-800 font-semibold underline hover:no-underline transition-all duration-200"
-                  target="_blank"
-                >
+                <Link href="/terminos" className="terminos-link" target="_blank">
                   términos y condiciones
                 </Link>{' '}
                 y la{' '}
-                <Link 
-                  href="/politica-privacidad" 
-                  className="text-blue-600 hover:text-blue-800 font-semibold underline hover:no-underline transition-all duration-200"
-                  target="_blank"
-                >
+                <Link href="/politica-privacidad" className="terminos-link" target="_blank">
                   política de privacidad
                 </Link>{' '}
                 de Zitapp.
@@ -469,72 +712,79 @@ export default function RegistroPage() {
             </motion.div>
           )}
 
-          {/* Botón */}
+          {/* Botón submit */}
           <motion.button
             type="submit"
             disabled={loading || !aceptaTerminos}
-            whileTap={{ scale: 0.95 }}
-            className={`py-4 rounded-xl font-semibold text-lg transition-all duration-200 shadow-sm hover:shadow-md ${
-              loading || !aceptaTerminos
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white hover:scale-105'
-            }`}
+            whileTap={{ scale: 0.97 }}
+            className="btn-registro"
+            style={{ marginTop: 4 }}
           >
             {loading ? 'Registrando...' : 'Crear cuenta'}
           </motion.button>
         </motion.form>
-        
-        {/* Botón de soporte */}
-          <motion.div
-            className="text-center mt-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.65 }}
-          >
-            <p className="text-sm text-gray-700 mb-3">
-              ¿Necesitas ayuda?
-            </p>
-            <button 
-              onClick={() => window.open('https://wa.me/573001334528?text=Hola,%20necesito%20ayuda%20con%20el%20registro%20en%20Zitapp', '_blank')}
-              className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.485"/>
-              </svg>
-              Ayuda con Registro
-            </button>
-          </motion.div>
 
-        {/* Enlace al login */}
-        <motion.p 
-          className="text-lg text-center text-gray-700 font-medium mt-6"
+        {/* Soporte WhatsApp */}
+        <motion.div
+          style={{ textAlign: 'center', marginTop: 20 }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
         >
-          ¿Ya tienes una cuenta?{' '}
-          <span
-            onClick={() => router.push('/login')}
-            className="text-blue-600 font-bold hover:text-purple-600 transition-colors duration-200 hover:scale-105 transform inline-block cursor-pointer"
+          <div className="divider" />
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#475569', marginBottom: 10 }}>
+            ¿Necesitas ayuda?
+          </p>
+          <button
+            onClick={() => window.open('https://wa.me/573001334528?text=Hola,%20necesito%20ayuda%20con%20el%20registro%20en%20Zitapp', '_blank')}
+            className="btn-whatsapp"
           >
-            Inicia sesión
-          </span>
-        </motion.p>
-        {mounted && (
-        <motion.p
-          className="text-sm text-gray-500 mt-6 text-center"
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.485"/>
+            </svg>
+            Ayuda con Registro
+          </button>
+        </motion.div>
+
+        {/* Enlace al login */}
+        <motion.div
+          style={{ textAlign: 'center', marginTop: 16 }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.65 }}
         >
-          © {new Date().getFullYear()} Zitapp — Reservas Inteligentes
-        </motion.p>
+          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 14, color: '#64748B' }}>
+            ¿Ya tienes una cuenta?{' '}
+          </span>
+          <button
+            onClick={() => router.push('/login')}
+            className="btn-login-link"
+          >
+            Inicia sesión
+          </button>
+        </motion.div>
+
+        {/* Copyright */}
+        {mounted && (
+          <motion.p
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: 12,
+              color: '#1E293B',
+              textAlign: 'center',
+              marginTop: 20,
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+          >
+            © {new Date().getFullYear()} Zitapp — Reservas Inteligentes
+          </motion.p>
         )}
       </motion.div>
     </div>
   )
 }
-
 
 
 

@@ -927,7 +927,7 @@ function ReservarSlugContent() {
             <label className="block text-sm text-gray-700 mb-1">Selecciona una hora:</label>
             {horas.length === 0 ? (
               <p className="text-sm text-red-500">
-                Esta barbería no tiene horarios configurados para este día.
+                Este negocio no tiene horarios configurados para este día.
               </p>
             ) : (
               <div className="grid grid-cols-3 gap-2">

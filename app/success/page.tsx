@@ -15,6 +15,15 @@ function SuccessContent() {
     const activateUser = async () => {
       try {
         console.log('Iniciando activación automática...');
+
+        // ✅ FIX: Extraer transactionId de la URL que Wompi agrega automáticamente
+        const transactionId = searchParams?.get('id') || null;
+        console.log('TransactionId desde URL:', transactionId);
+        console.log('Todos los params de URL:', {
+          id: searchParams?.get('id'),
+          reference: searchParams?.get('reference'),
+          status: searchParams?.get('status'),
+        });
         
         // Leer datos del localStorage
         let pendingActivationData = localStorage.getItem('pendingActivation');
@@ -27,24 +36,21 @@ function SuccessContent() {
             const renewal = JSON.parse(renewalData);
             console.log('Datos de renovación encontrados en sessionStorage:', renewal);
             
-            // Convertir formato de sessionStorage a localStorage format
             const activationData = {
               email: renewal.email,
-              planId: 'basico', // Valor por defecto
+              planId: 'basico',
               planNombre: 'Plan Renovado',
               notificaciones: false,
               timestamp: Date.now()
             };
             
             pendingActivationData = JSON.stringify(activationData);
-            
-            // Limpiar sessionStorage
             sessionStorage.removeItem('renewalData');
             console.log('Datos de renovación convertidos para activación:', activationData);
           }
         }
 
-        // SOLUCIÓN DE EMERGENCIA: Si no hay datos en storage, usar reference de URL
+        // Si no hay datos en storage, usar reference de URL
         if (!pendingActivationData) {
           console.log('No hay datos en storage, verificando URL reference...');
           const reference = searchParams?.get('reference');
@@ -53,14 +59,12 @@ function SuccessContent() {
             console.log('Reference encontrada:', reference);
             
             try {
-              // Extraer datos de la reference
               const parts = reference.split('_');
-              const planId = parts[1]; // 'pro', 'basico', etc.
-              const userId = parts[2]; // user ID
+              const planId = parts[1];
+              const userId = parts[2];
               
               console.log('Partes de reference:', { planId, userId });
               
-              // Buscar datos reales de la transacción en la BD
               const { data: transaccion, error: transError } = await supabase
                 .from('transacciones_pendientes')
                 .select('*')
@@ -75,7 +79,6 @@ function SuccessContent() {
               
               console.log('Transacción encontrada:', transaccion);
               
-              // Buscar datos del usuario
               const { data: cliente, error: clienteError } = await supabase
                 .from('clientes')
                 .select('correo, nombre')
@@ -89,7 +92,6 @@ function SuccessContent() {
               
               console.log('Cliente encontrado:', cliente);
               
-              // Crear datos de activación desde la BD
               const activationData = {
                 email: cliente.correo,
                 planId: transaccion.plan_id,
@@ -103,9 +105,8 @@ function SuccessContent() {
               
             } catch (referenceError) {
               console.error('Error procesando reference:', referenceError);
-              // Fallback con datos básicos si falla la consulta BD
               const activationData = {
-                email: 'usuario@email.com', // Valor por defecto
+                email: 'usuario@email.com',
                 planId: 'pro',
                 planNombre: 'Plan Pro',
                 notificaciones: true,
@@ -130,7 +131,7 @@ function SuccessContent() {
         setUserEmail(activationData.email);
         setPlanName(activationData.planNombre);
 
-        // Llamar al endpoint de activación
+        // ✅ FIX: Enviar transactionId al API
         const response = await fetch('/api/activate-user', {
           method: 'POST',
           headers: { 
@@ -139,7 +140,8 @@ function SuccessContent() {
           body: JSON.stringify({
             email: activationData.email,
             planId: activationData.planId,
-            planNombre: activationData.planNombre
+            planNombre: activationData.planNombre,
+            transactionId: transactionId
           })
         });
 
@@ -150,7 +152,6 @@ function SuccessContent() {
           console.log('Usuario activado exitosamente');
           setActivationStatus('success');
           
-          // Limpiar localStorage después del éxito si existe
           if (localStorage.getItem('pendingActivation')) {
             localStorage.removeItem('pendingActivation');
             console.log('localStorage limpiado');
@@ -169,13 +170,10 @@ function SuccessContent() {
       }
     };
     
-    // Ejecutar activación después de un pequeño delay
     const timer = setTimeout(activateUser, 1000);
-    
     return () => clearTimeout(timer);
   }, []);
 
-  // Función para reintentar activación manual
   const retryActivation = () => {
     setActivationStatus('loading');
     window.location.reload();
@@ -291,7 +289,7 @@ function SuccessContent() {
         {/* Debug Info */}
         <div className="mt-8 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-400">
-            ID de transacción: {searchParams?.get('reference') || searchParams?.get('id') || 'N/A'}
+            ID de transacción: {searchParams?.get('id') || searchParams?.get('reference') || 'N/A'}
           </p>
         </div>
       </div>

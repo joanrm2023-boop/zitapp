@@ -166,7 +166,7 @@ function generarEmailConfirmacion(reserva: any, cliente: any) {
             <div class="info-card">
               <div class="info-row">
                 <span class="info-label">📅 Fecha:</span>
-                <span class="info-value highlight">${new Date(reserva.fecha).toLocaleDateString('es-ES', { 
+                <span class="info-value highlight">${new Date(reserva.fecha + 'T00:00:00').toLocaleDateString('es-ES', {
                   weekday: 'long', 
                   year: 'numeric', 
                   month: 'long', 
@@ -223,7 +223,7 @@ function generarEmailConfirmacion(reserva: any, cliente: any) {
 
 // Template para email de recordatorio
 function generarEmailRecordatorio(reserva: any, cliente: any) {
-  const fechaCita = new Date(reserva.fecha);
+  const fechaCita = new Date(reserva.fecha + 'T00:00:00');
   
   return `
     <!DOCTYPE html>
