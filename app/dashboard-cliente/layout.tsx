@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
-
 import {
   Home,
   Calendar,
@@ -15,11 +14,92 @@ import {
   X,
   DollarSign,
   Package,
+  ChevronRight,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import 'react-datepicker/dist/react-datepicker.css';
+import 'react-datepicker/dist/react-datepicker.css'
 import { supabase } from '@/lib/supabaseClient'
 import { ReactNode } from 'react'
+
+// ── Configuración de módulos con colores individuales ──
+const getNavLinks = (tipoNegocio: string) => {
+  const links = [
+    {
+      href: '/dashboard-cliente',
+      label: 'Inicio',
+      icon: Home,
+      color: '#60A5FA',
+      bg: 'rgba(96,165,250,0.12)',
+      border: 'rgba(96,165,250,0.3)',
+      glow: 'rgba(96,165,250,0.2)',
+    },
+    {
+      href: '/dashboard-cliente/mi-negocio',
+      label: 'Mi negocio',
+      icon: Settings,
+      color: '#A78BFA',
+      bg: 'rgba(167,139,250,0.12)',
+      border: 'rgba(167,139,250,0.3)',
+      glow: 'rgba(167,139,250,0.2)',
+    },
+    {
+      href: '/dashboard-cliente/servicios',
+      label: 'Servicios',
+      icon: Package,
+      color: '#34D399',
+      bg: 'rgba(52,211,153,0.12)',
+      border: 'rgba(52,211,153,0.3)',
+      glow: 'rgba(52,211,153,0.2)',
+    },
+    {
+      href: '/dashboard-cliente/ventas',
+      label: 'Ventas',
+      icon: DollarSign,
+      color: '#FBBF24',
+      bg: 'rgba(251,191,36,0.12)',
+      border: 'rgba(251,191,36,0.3)',
+      glow: 'rgba(251,191,36,0.2)',
+    },
+  ]
+
+  if (['barberia', 'spa', 'veterinaria'].includes(tipoNegocio?.toLowerCase())) {
+    links.push({
+      href: '/dashboard-cliente/barberos',
+      label: 'Profesionales',
+      icon: Users,
+      color: '#FB923C',
+      bg: 'rgba(251,146,60,0.12)',
+      border: 'rgba(251,146,60,0.3)',
+      glow: 'rgba(251,146,60,0.2)',
+    })
+  }
+
+  if (tipoNegocio === 'cancha') {
+    links.push({
+      href: '/dashboard-cliente/canchas',
+      label: 'Canchas',
+      icon: Users,
+      color: '#FB923C',
+      bg: 'rgba(251,146,60,0.12)',
+      border: 'rgba(251,146,60,0.3)',
+      glow: 'rgba(251,146,60,0.2)',
+    })
+  }
+
+  links.push({
+    href: tipoNegocio === 'cancha'
+      ? '/dashboard-cliente/reservas-canchas'
+      : '/dashboard-cliente/reservas',
+    label: 'Reservas',
+    icon: Calendar,
+    color: '#38BDF8',
+    bg: 'rgba(56,189,248,0.12)',
+    border: 'rgba(56,189,248,0.3)',
+    glow: 'rgba(56,189,248,0.2)',
+  })
+
+  return links
+}
 
 export default function ClienteLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -27,6 +107,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
   const [clienteNombre, setClienteNombre] = useState('cliente')
   const [clienteLogo, setClienteLogo] = useState('')
   const [tipoNegocio, setTipoNegocio] = useState('')
+  const pathname = usePathname()
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -36,66 +117,170 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const obtenerCliente = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
       const { data } = await supabase
         .from('clientes')
         .select('nombre, tipo_negocio, logo_url')
         .eq('user_id', user.id)
         .maybeSingle()
-
       if (data?.nombre) setClienteNombre(data.nombre)
       if (data?.tipo_negocio) setTipoNegocio(data.tipo_negocio)
       if (data?.logo_url) setClienteLogo(data.logo_url)
     }
-
     obtenerCliente()
   }, [])
 
-  /* ── Sección logo compartida ── */
-  const logoSection = (small = false) => (
-    <motion.div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
-        borderRadius: 14,
-        padding: small ? 8 : 10,
-        marginBottom: 20,
-        boxShadow: '0 4px 20px rgba(37,99,235,0.35)',
-        border: '1px solid rgba(56,189,248,0.2)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-      whileHover={{ scale: 1.03 }}
-      transition={{ duration: 0.2 }}
-    >
-      {/* Glow interior */}
-      <div style={{
-        position: 'absolute', top: -20, right: -20,
-        width: 80, height: 80,
-        background: 'radial-gradient(circle, rgba(56,189,248,0.3) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
+  const navLinks = getNavLinks(tipoNegocio)
+
+  // ── Avatar del negocio ──
+  const BusinessAvatar = ({ size = 40 }: { size?: number }) => (
+    clienteLogo ? (
       <img
-        src="/logo_Zitapp.png"
-        alt="Logo"
+        src={clienteLogo}
+        alt={clienteNombre}
         style={{
-          width: small ? 100 : (sidebarOpen ? 250 : 88),
-          height: small ? 100 : (sidebarOpen ? 250 : 88),
-          transition: 'all 0.3s',
-          objectFit: 'contain',
-          position: 'relative',
-          zIndex: 1,
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '2px solid rgba(37,99,235,0.4)',
+          boxShadow: '0 0 0 3px rgba(37,99,235,0.1)',
+          flexShrink: 0,
         }}
       />
-    </motion.div>
+    ) : (
+      <div style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #1D4ED8, #38BDF8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'Syne, sans-serif',
+        fontWeight: 800,
+        fontSize: size * 0.38,
+        color: 'white',
+        flexShrink: 0,
+        border: '2px solid rgba(56,189,248,0.3)',
+        boxShadow: '0 0 12px rgba(37,99,235,0.3)',
+      }}>
+        {clienteNombre.charAt(0).toUpperCase()}
+      </div>
+    )
   )
+
+  // ── NavItem con color por módulo ──
+  const NavItem = ({
+    link,
+    collapsed = false,
+    onClick,
+  }: {
+    link: ReturnType<typeof getNavLinks>[0]
+    collapsed?: boolean
+    onClick?: () => void
+  }) => {
+    const isActive = pathname === link.href ||
+      (link.href !== '/dashboard-cliente' && pathname?.startsWith(link.href))
+    const Icon = link.icon
+
+    return (
+      <Link href={link.href} onClick={onClick} style={{ textDecoration: 'none' }}>
+        <motion.div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 12,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            padding: collapsed ? '10px' : '10px 12px',
+            borderRadius: 12,
+            position: 'relative',
+            cursor: 'pointer',
+            background: isActive ? link.bg : 'transparent',
+            border: `1px solid ${isActive ? link.border : 'transparent'}`,
+            boxShadow: isActive ? `0 0 16px ${link.glow}` : 'none',
+          }}
+          whileHover={{
+            background: link.bg,
+            borderColor: link.border,
+            boxShadow: `0 0 16px ${link.glow}`,
+          }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ duration: 0.15 }}
+        >
+          {/* Barra lateral activo */}
+          {isActive && (
+            <motion.div
+              layoutId="activeBar"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '20%',
+                bottom: '20%',
+                width: 3,
+                borderRadius: 999,
+                background: link.color,
+                boxShadow: `0 0 8px ${link.color}`,
+              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            />
+          )}
+
+          {/* Ícono */}
+          <motion.div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              background: isActive
+                ? `${link.color}22`
+                : 'rgba(255,255,255,0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              border: `1px solid ${isActive ? link.border : 'rgba(255,255,255,0.06)'}`,
+              transition: 'all 0.2s',
+            }}
+            whileHover={{
+              background: `${link.color}22`,
+              borderColor: link.border,
+            }}
+          >
+            <Icon
+              size={16}
+              style={{
+                color: isActive ? link.color : '#64748B',
+                transition: 'color 0.2s',
+              }}
+            />
+          </motion.div>
+
+          {/* Label */}
+          {!collapsed && (
+            <span style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: isActive ? 700 : 500,
+              fontSize: 14,
+              color: isActive ? link.color : '#94A3B8',
+              flex: 1,
+              transition: 'color 0.2s',
+            }}>
+              {link.label}
+            </span>
+          )}
+
+          {/* Flecha activo */}
+          {!collapsed && isActive && (
+            <ChevronRight size={14} style={{ color: link.color, opacity: 0.7 }} />
+          )}
+        </motion.div>
+      </Link>
+    )
+  }
 
   return (
     <div style={{
@@ -107,41 +292,6 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
-
-        .nav-link {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          color: #94A3B8;
-          border-radius: 10px;
-          padding: 10px 12px;
-          transition: all 0.2s;
-          text-decoration: none;
-          font-family: 'DM Sans', sans-serif;
-          font-weight: 500;
-          font-size: 14px;
-        }
-        .nav-link:hover {
-          color: white;
-          background: rgba(37,99,235,0.15);
-        }
-        .nav-link-mobile {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          color: #94A3B8;
-          border-radius: 10px;
-          padding: 12px 14px;
-          transition: all 0.2s;
-          text-decoration: none;
-          font-family: 'DM Sans', sans-serif;
-          font-weight: 500;
-          font-size: 15px;
-        }
-        .nav-link-mobile:hover {
-          color: white;
-          background: rgba(37,99,235,0.15);
-        }
         .toggle-btn {
           background: rgba(255,255,255,0.05);
           border: 1px solid rgba(255,255,255,0.08);
@@ -166,7 +316,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
         style={{
           display: 'none',
           flexDirection: 'column',
-          gap: 6,
+          gap: 4,
           padding: '16px',
           background: '#1E4068',
           borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -177,62 +327,76 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           top: 0,
           height: '100vh',
           overflowY: 'auto',
+          overflowX: 'hidden',
         }}
         className="md:flex"
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Logo con fondo azul vibrante */}
-        {logoSection(false)}
+        {/* Header negocio sidebar */}
+        <motion.div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: sidebarOpen ? 12 : 0,
+            justifyContent: sidebarOpen ? 'flex-start' : 'center',
+            padding: '12px 8px',
+            marginBottom: 8,
+            borderRadius: 14,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            overflow: 'hidden',
+          }}
+          layout
+        >
+          <BusinessAvatar size={sidebarOpen ? 40 : 36} />
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ overflow: 'hidden', minWidth: 0 }}
+              >
+                <p style={{
+                  fontFamily: 'Syne, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  color: 'white',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  lineHeight: 1.2,
+                }}>
+                  {clienteNombre}
+                </p>
+                <p style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 11,
+                  color: '#64748B',
+                  marginTop: 2,
+                }}>
+                  Panel de Control
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {/* Separador */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 12 }} />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8 }} />
 
-        {/* Navegación */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-          <Link href="/dashboard-cliente" className="nav-link">
-            <Home size={18} style={{ flexShrink: 0 }} />
-            {sidebarOpen && <span>Inicio</span>}
-          </Link>
-
-          <Link href="/dashboard-cliente/mi-negocio" className="nav-link">
-            <Settings size={18} style={{ flexShrink: 0 }} />
-            {sidebarOpen && <span>Mi negocio</span>}
-          </Link>
-
-          <Link href="/dashboard-cliente/servicios" className="nav-link">
-            <Package size={18} style={{ flexShrink: 0 }} />
-            {sidebarOpen && <span>Servicios</span>}
-          </Link>
-
-          <Link href="/dashboard-cliente/ventas" className="nav-link">
-            <DollarSign size={18} style={{ flexShrink: 0 }} />
-            {sidebarOpen && <span>Ventas</span>}
-          </Link>
-
-          {['barberia', 'spa', 'veterinaria'].includes(tipoNegocio?.toLowerCase()) && (
-            <Link href="/dashboard-cliente/barberos" className="nav-link">
-              <Users size={18} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Profesionales</span>}
-            </Link>
-          )}
-
-          {tipoNegocio === 'cancha' && (
-            <Link href="/dashboard-cliente/canchas" className="nav-link">
-              <Users size={18} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Canchas</span>}
-            </Link>
-          )}
-
-          <Link
-            href={tipoNegocio === 'cancha' ? '/dashboard-cliente/reservas-canchas' : '/dashboard-cliente/reservas'}
-            className="nav-link"
-          >
-            <Calendar size={18} style={{ flexShrink: 0 }} />
-            {sidebarOpen && <span>Reservas</span>}
-          </Link>
+        {/* Nav */}
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+          {navLinks.map((link) => (
+            <NavItem key={link.href} link={link} collapsed={!sidebarOpen} />
+          ))}
         </nav>
+
+        {/* Separador */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
 
         {/* Logout */}
         <motion.button
@@ -240,32 +404,36 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
+            gap: sidebarOpen ? 12 : 0,
+            justifyContent: sidebarOpen ? 'flex-start' : 'center',
             color: '#F87171',
             background: 'rgba(239,68,68,0.08)',
             border: '1px solid rgba(239,68,68,0.15)',
-            borderRadius: 10,
-            padding: '10px 12px',
+            borderRadius: 12,
+            padding: sidebarOpen ? '10px 12px' : '10px',
             cursor: 'pointer',
             fontFamily: 'DM Sans, sans-serif',
             fontWeight: 600,
             fontSize: 14,
             transition: 'all 0.2s',
-            marginTop: 8,
             width: '100%',
           }}
-          whileHover={{ scale: 1.02 }}
+          whileHover={{
+            background: 'rgba(239,68,68,0.15)',
+            borderColor: 'rgba(239,68,68,0.3)',
+          }}
           whileTap={{ scale: 0.98 }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.15)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.3)'
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.15)'
-          }}
         >
-          <LogOut size={18} style={{ flexShrink: 0 }} />
+          <div style={{
+            width: 34, height: 34,
+            borderRadius: 9,
+            background: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <LogOut size={16} />
+          </div>
           {sidebarOpen && <span>Cerrar sesión</span>}
         </motion.button>
       </motion.aside>
@@ -295,9 +463,10 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
                 padding: '16px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6,
+                gap: 4,
                 width: 260,
                 boxShadow: '8px 0 32px rgba(0,0,0,0.4)',
+                overflowY: 'auto',
               }}
               className="md:hidden"
               initial={{ x: -300 }}
@@ -305,42 +474,36 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
               exit={{ x: -300 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
             >
-              {/* Header móvil — logo + botón cerrar */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4, gap: 8 }}>
-
-                {/* Logo con fondo azul vibrante */}
-                <motion.div
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
-                    borderRadius: 14,
-                    padding: 12,
-                    boxShadow: '0 4px 20px rgba(37,99,235,0.35)',
-                    border: '1px solid rgba(56,189,248,0.2)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <div style={{
-                    position: 'absolute', top: -20, right: -20,
-                    width: 80, height: 80,
-                    background: 'radial-gradient(circle, rgba(56,189,248,0.3) 0%, transparent 70%)',
-                    pointerEvents: 'none',
-                  }} />
-                  <img
-                    src="/logo_Zitapp.png"
-                    alt="Logo"
-                    style={{ width: 72, height: 72, objectFit: 'contain', position: 'relative', zIndex: 1 }}
-                  />
-                </motion.div>
-
-                {/* Botón cerrar */}
+              {/* Header móvil */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 8px',
+                marginBottom: 8,
+                borderRadius: 14,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+                  <BusinessAvatar size={38} />
+                  <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                    <p style={{
+                      fontFamily: 'Syne, sans-serif',
+                      fontWeight: 800,
+                      fontSize: 15,
+                      color: 'white',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {clienteNombre}
+                    </p>
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#64748B' }}>
+                      Panel de Control
+                    </p>
+                  </div>
+                </div>
                 <motion.button
                   onClick={() => setMobileMenuOpen(false)}
                   style={{
@@ -350,12 +513,11 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
                     cursor: 'pointer', color: '#94A3B8',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
-                    marginTop: 4,
                   }}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </motion.button>
               </div>
 
@@ -363,47 +525,18 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8 }} />
 
               {/* Nav móvil */}
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                <Link href="/dashboard-cliente" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                  <Home size={18} />
-                  <span>Inicio</span>
-                </Link>
-                <Link href="/dashboard-cliente/mi-negocio" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                  <Settings size={18} />
-                  <span>Mi negocio</span>
-                </Link>
-                <Link href="/dashboard-cliente/servicios" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                  <Package size={18} />
-                  <span>Servicios</span>
-                </Link>
-                <Link href="/dashboard-cliente/ventas" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                  <DollarSign size={18} />
-                  <span>Ventas</span>
-                </Link>
-
-                {['barberia', 'spa', 'veterinaria'].includes(tipoNegocio?.toLowerCase()) && (
-                  <Link href="/dashboard-cliente/barberos" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                    <Users size={18} />
-                    <span>Profesionales</span>
-                  </Link>
-                )}
-
-                {tipoNegocio === 'cancha' && (
-                  <Link href="/dashboard-cliente/canchas" onClick={() => setMobileMenuOpen(false)} className="nav-link-mobile">
-                    <Users size={18} />
-                    <span>Canchas</span>
-                  </Link>
-                )}
-
-                <Link
-                  href={tipoNegocio === 'cancha' ? '/dashboard-cliente/reservas-canchas' : '/dashboard-cliente/reservas'}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="nav-link-mobile"
-                >
-                  <Calendar size={18} />
-                  <span>Reservas</span>
-                </Link>
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
+                {navLinks.map((link) => (
+                  <NavItem
+                    key={link.href}
+                    link={link}
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                ))}
               </nav>
+
+              {/* Separador */}
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
 
               {/* Logout móvil */}
               <motion.button
@@ -415,20 +548,28 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
                   color: '#F87171',
                   background: 'rgba(239,68,68,0.08)',
                   border: '1px solid rgba(239,68,68,0.15)',
-                  borderRadius: 10,
+                  borderRadius: 12,
                   padding: '12px 14px',
                   cursor: 'pointer',
                   fontFamily: 'DM Sans, sans-serif',
                   fontWeight: 600,
                   fontSize: 15,
                   transition: 'all 0.2s',
-                  marginTop: 8,
                   width: '100%',
                 }}
-                whileHover={{ scale: 1.02, y: -2 }}
+                whileHover={{ background: 'rgba(239,68,68,0.15)' }}
                 whileTap={{ scale: 0.98 }}
               >
-                <LogOut size={18} />
+                <div style={{
+                  width: 34, height: 34,
+                  borderRadius: 9,
+                  background: 'rgba(239,68,68,0.12)',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <LogOut size={16} />
+                </div>
                 <span>Cerrar sesión</span>
               </motion.button>
             </motion.aside>
@@ -445,7 +586,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '16px 24px',
+            padding: '14px 20px',
             background: '#163354',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
             position: 'sticky',
@@ -456,7 +597,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Menu hamburguesa móvil */}
+          {/* Hamburguesa móvil */}
           <motion.button
             onClick={() => setMobileMenuOpen(true)}
             className="toggle-btn md:hidden"
@@ -476,44 +617,32 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </motion.button>
 
-          {/* Saludo + logo cliente */}
+          {/* Logo + nombre negocio en header */}
           <motion.div
-            style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <motion.h2
-              style={{
+            <BusinessAvatar size={34} />
+            <div>
+              <p style={{
+                fontFamily: 'Syne, sans-serif',
+                fontWeight: 800,
+                fontSize: 14,
+                color: 'white',
+                lineHeight: 1.2,
+              }}>
+                {clienteNombre}
+              </p>
+              <p style={{
                 fontFamily: 'DM Sans, sans-serif',
-                fontSize: 15,
-                fontWeight: 600,
-                color: '#94A3B8',
-              }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              Hola,{' '}
-              <span style={{ color: 'white' }}>{clienteNombre}</span>
-            </motion.h2>
-
-            {clienteLogo && (
-              <motion.img
-                src={clienteLogo}
-                alt="Logo del negocio"
-                style={{
-                  width: 36, height: 36,
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid rgba(37,99,235,0.4)',
-                  boxShadow: '0 0 0 3px rgba(37,99,235,0.1)',
-                }}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.4, type: 'spring' }}
-              />
-            )}
+                fontSize: 11,
+                color: '#64748B',
+              }}>
+                Panel de Control
+              </p>
+            </div>
           </motion.div>
         </motion.div>
 

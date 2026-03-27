@@ -13,7 +13,7 @@ const planes = [
   {
     id: 'basico',
     nombre: 'Básico',
-    precio: 28000,
+    precio: 29000,
     profesionales: '1 profesional',
     maxProfesionales: 1,
     descripcion: 'Perfecto para emprendedores y profesionales independientes',
