@@ -50,6 +50,8 @@ function ReservarSlugContent() {
   const [esError, setEsError] = useState(false);
 
   const mensajeRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownAbierto, setDropdownAbierto] = useState(false);
 
   const [mostrarToast, setMostrarToast] = useState(false);
   const [textoToast, setTextoToast] = useState('');
@@ -735,6 +737,16 @@ function ReservarSlugContent() {
   const hayErrores = !!(errorNombre || errorCorreo || errorIdentificacion || errorTelefono || errorFecha || errorIdentificacionDuplicada);
   const formularioIncompleto = camposFaltantes.length > 0 || hayErrores;
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownAbierto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (cargando) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white to-blue-100 flex justify-center items-center py-8 px-4">
@@ -893,35 +905,62 @@ function ReservarSlugContent() {
             </div>
 
           <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Profesional que te atenderá
-          </label>
-          <div className="relative">
-            <select
-              value={barberoSeleccionado}
-              onChange={handleBarberoChange}
-              className="text-gray-800 border border-gray-300 rounded-lg p-3 pr-10 pl-11 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full appearance-none text-sm"
-            >
-              <option value="">Selecciona un Profesional</option>
-              {barberos.map((barbero: any) => (
-                <option key={barbero.id_barbero} value={barbero.id_barbero}>
-                  {barbero.nombre_barbero}
-                </option>
-              ))}
-            </select>
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 pointer-events-none">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Profesional que te atenderá
+            </label>
+            <div ref={dropdownRef} className="relative">
+              {/* Botón trigger */}
+              <button
+                type="button"
+                onClick={() => setDropdownAbierto(!dropdownAbierto)}
+                className="text-gray-800 border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white w-full text-sm flex items-center gap-2 pr-10"
+              >
+                {barberoSeleccionado ? (() => {
+                  const b = barberos.find((b: any) => b.id_barbero === barberoSeleccionado);
+                  return (
+                    <>
+                      {b?.foto_url
+                        ? <img src={b.foto_url} alt={b.nombre_barbero} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        : <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                          </div>
+                      }
+                      <span>{b?.nombre_barbero}</span>
+                    </>
+                  );
+                })() : <span className="text-gray-400">Selecciona un Profesional</span>}
+                <svg className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Lista desplegable */}
+              {dropdownAbierto && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  {barberos.map((barbero: any) => (
+                    <button
+                      key={barbero.id_barbero}
+                      type="button"
+                      onClick={() => {
+                        marcarInteraccion();
+                        setBarberoSeleccionado(barbero.id_barbero);
+                        setDropdownAbierto(false);
+                      }}
+                      className={`w-full flex items-center gap-3 p-3 hover:bg-blue-50 transition-colors text-left ${barberoSeleccionado === barbero.id_barbero ? 'bg-blue-50' : ''}`}
+                    >
+                      {barbero.foto_url
+                        ? <img src={barbero.foto_url} alt={barbero.nombre_barbero} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                        : <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                          </div>
+                      }
+                      <span className="text-gray-800 text-sm font-medium">{barbero.nombre_barbero}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Selecciona una hora:</label>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pencil, Trash2, User, UserPlus, Mail, TrendingUp, Users } from 'lucide-react';
+import { Pencil, Trash2, User, UserPlus, Mail, TrendingUp, Users, Camera } from 'lucide-react';
 
 export default function ProfesionalesPage() {
   const [mounted, setMounted] = useState(false);
@@ -23,6 +23,8 @@ export default function ProfesionalesPage() {
   const [limitePlan, setLimitePlan] = useState<number>(0);
   const [profesionalEliminado, setProfesionalEliminado] = useState<string | null>(null);
   const [idCliente, setIdCliente] = useState<string>('');
+  const [fotoSubiendoId, setFotoSubiendoId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -182,6 +184,50 @@ export default function ProfesionalesPage() {
   };
 
   const cancelarEliminacion = () => { setConfirmacionVisible(false); setProfesionalAEliminar(null); };
+
+  const handleAvatarClick = (id: string) => {
+    setFotoSubiendoId(id);
+    fileInputRef.current?.click();
+  };
+
+  const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !fotoSubiendoId) return;
+    if (!file.type.startsWith('image/')) {
+      setMensajeError('Solo se permiten imágenes.');
+      setTimeout(() => setMensajeError(''), 3000);
+      setFotoSubiendoId(null); e.target.value = ''; return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setMensajeError('La imagen no puede superar los 2MB.');
+      setTimeout(() => setMensajeError(''), 3000);
+      setFotoSubiendoId(null); e.target.value = ''; return;
+    }
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${fotoSubiendoId}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from('profesionales_fotos')
+      .upload(fileName, file, { upsert: true });
+    if (uploadError) {
+      setMensajeError('Error al subir la foto.');
+      setTimeout(() => setMensajeError(''), 3000);
+      setFotoSubiendoId(null); e.target.value = ''; return;
+    }
+    const { data: { publicUrl } } = supabase.storage.from('profesionales_fotos').getPublicUrl(fileName);
+    const { error: updateError } = await supabase
+      .from('barberos')
+      .update({ foto_url: publicUrl })
+      .eq('id_barbero', fotoSubiendoId);
+    if (!updateError) {
+      setProfesionales(prev => prev.map(p => p.id_barbero === fotoSubiendoId ? { ...p, foto_url: publicUrl } : p));
+      setMensajeVisible(true);
+      setTimeout(() => setMensajeVisible(false), 3000);
+    } else {
+      setMensajeError('Error al guardar la foto.');
+      setTimeout(() => setMensajeError(''), 3000);
+    }
+    setFotoSubiendoId(null); e.target.value = '';
+  };
 
   if (!mounted) return null;
 
@@ -412,6 +458,31 @@ export default function ProfesionalesPage() {
           text-align: center;
         }
 
+        .pf-avatar {
+          position: relative;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          cursor: pointer;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .pf-avatar-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.55);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .pf-avatar:hover .pf-avatar-overlay { opacity: 1; }
+
         @media (max-width: 640px) {
           .pf-grid-2 { grid-template-columns: 1fr !important; }
           .pf-grid-3 { grid-template-columns: 1fr !important; }
@@ -606,8 +677,19 @@ export default function ProfesionalesPage() {
                 <div style={{ padding: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ background: 'linear-gradient(135deg, #1D4ED8, #38BDF8)', padding: 10, borderRadius: '50%', flexShrink: 0 }}>
-                        <User size={18} color="white" />
+                      <div
+                        className="pf-avatar"
+                        style={{ background: p.foto_url ? 'transparent' : 'linear-gradient(135deg, #1D4ED8, #38BDF8)' }}
+                        onClick={() => handleAvatarClick(p.id_barbero)}
+                        title="Cambiar foto"
+                      >
+                        {p.foto_url
+                          ? <img src={p.foto_url} alt={p.nombre_barbero} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                          : <User size={18} color="white" />
+                        }
+                        <div className="pf-avatar-overlay">
+                          <Camera size={14} color="white" />
+                        </div>
                       </div>
                       <div>
                         <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: 'white', fontSize: 16, marginBottom: 4 }}>{p.nombre_barbero}</h3>
@@ -634,6 +716,15 @@ export default function ProfesionalesPage() {
           ))}
         </div>
       )}
+
+      {/* Input oculto para subir foto */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFotoChange}
+      />
     </motion.div>
   );
 }
