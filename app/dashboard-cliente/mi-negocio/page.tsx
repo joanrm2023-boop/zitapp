@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Lock, Eye, EyeOff, Calendar, Settings, Store, Link2, Copy, Globe, TrendingUp, CreditCard, Upload } from 'lucide-react';
+import { Clock, Lock, Eye, EyeOff, Calendar, Settings, Store, Link2, Copy, Globe, TrendingUp, CreditCard } from 'lucide-react';
 import toast from "react-hot-toast";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -24,7 +24,6 @@ export default function MiNegocioPage() {
   const [bloques, setBloques] = useState<Record<string, string[]>>({});
   const [intervaloInvalido, setIntervaloInvalido] = useState(false);
   const [mensajeVisible, setMensajeVisible] = useState(false);
-  const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const [mesActual, setMesActual] = useState(new Date());
@@ -89,35 +88,6 @@ export default function MiNegocioPage() {
     if (cliente) { cargarDiasBloqueados(); }
   }, [cliente]);
 
-  const subirLogo = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file || !cliente) return;
-    if (file.size > 1024 * 1024) { toast.error("El archivo es muy grande. Máximo 1MB."); return; }
-    if (!file.type.startsWith('image/')) { toast.error("Solo se permiten archivos de imagen."); return; }
-    setSubiendoLogo(true);
-    try {
-      if (cliente.logo_url) {
-        const nombreAnterior = cliente.logo_url.split('/').pop();
-        await supabase.storage.from('logos').remove([nombreAnterior]);
-      }
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${cliente.id_cliente}-${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage.from('logos').upload(fileName, file);
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('logos').getPublicUrl(fileName);
-      const logoUrl = urlData.publicUrl;
-      const { error: updateError } = await supabase.from('clientes').update({ logo_url: logoUrl }).eq('id_cliente', cliente.id_cliente);
-      if (updateError) throw updateError;
-      setCliente(prev => ({ ...prev, logo_url: logoUrl }));
-      toast.success("✅ Logo subido correctamente");
-    } catch (error) {
-      console.error('Error subiendo logo:', error);
-      toast.error("Error al subir el logo: " + error.message);
-    } finally {
-      setSubiendoLogo(false);
-      event.target.value = '';
-    }
-  };
 
   const generarBloques = () => {
     const start = convertirAHoras(rangoInicio);
@@ -749,36 +719,6 @@ export default function MiNegocioPage() {
             </div>
 
             <div className="mn-divider" />
-
-            {/* Logo */}
-            <div style={{ marginBottom: 16 }}>
-              <label className="mn-label">Logo del negocio (opcional):</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {cliente?.logo_url && (
-                  <div className="mn-logo-preview">
-                    <img src={cliente.logo_url} alt="Logo actual" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
-                    <div>
-                      <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: 'white', fontSize: 13 }}>Logo actual</p>
-                      <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#64748B', fontSize: 12 }}>Se muestra en tu página de reservas</p>
-                    </div>
-                  </div>
-                )}
-                <div style={{ position: 'relative' }}>
-                  <input type="file" accept="image/*" onChange={subirLogo} disabled={subiendoLogo} className="mn-file-input" />
-                  {subiendoLogo ? (
-                    <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>
-                      <div style={{ width: 16, height: 16, border: '2px solid rgba(37,99,235,0.3)', borderTop: '2px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    </div>
-                  ) : (
-                    <Upload size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-                  )}
-                </div>
-                <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 11, color: '#475569' }}>
-                  📎 Formatos: JPG, PNG, SVG • Tamaño máximo: 1MB • Recomendado: 200x200px mínimo
-                </p>
-                {subiendoLogo && <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#60A5FA' }}>Subiendo logo...</p>}
-              </div>
-            </div>
 
             <div className="mn-divider" />
 

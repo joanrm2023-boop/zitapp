@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
@@ -15,6 +15,8 @@ import {
   DollarSign,
   Package,
   ChevronRight,
+  Camera,
+  Eye,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -106,7 +108,12 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [clienteNombre, setClienteNombre] = useState('cliente')
   const [clienteLogo, setClienteLogo] = useState('')
+  const [idCliente, setIdCliente] = useState('')
   const [tipoNegocio, setTipoNegocio] = useState('')
+  const [menuLogoTarget, setMenuLogoTarget] = useState<'sidebar' | 'header' | null>(null)
+  const [verLogoAbierto, setVerLogoAbierto] = useState(false)
+  const [logoSubiendo, setLogoSubiendo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -121,55 +128,117 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
       if (!user) return
       const { data } = await supabase
         .from('clientes')
-        .select('nombre, tipo_negocio, logo_url')
+        .select('nombre, tipo_negocio, logo_url, id_cliente')
         .eq('user_id', user.id)
         .maybeSingle()
       if (data?.nombre) setClienteNombre(data.nombre)
       if (data?.tipo_negocio) setTipoNegocio(data.tipo_negocio)
       if (data?.logo_url) setClienteLogo(data.logo_url)
+      if (data?.id_cliente) setIdCliente(data.id_cliente)
     }
     obtenerCliente()
   }, [])
 
   const navLinks = getNavLinks(tipoNegocio)
 
+  // Cerrar menú al hacer clic afuera
+  useEffect(() => {
+    if (!menuLogoTarget) return
+    const handleClick = () => setMenuLogoTarget(null)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [menuLogoTarget])
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !idCliente) return
+    if (!file.type.startsWith('image/')) { e.target.value = ''; return }
+    if (file.size > 2 * 1024 * 1024) { e.target.value = ''; return }
+    setLogoSubiendo(true)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${idCliente}.${fileExt}`
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(fileName, file, { upsert: true })
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(fileName)
+      await supabase.from('clientes').update({ logo_url: publicUrl }).eq('id_cliente', idCliente)
+      setClienteLogo(publicUrl)
+    }
+    setLogoSubiendo(false)
+    e.target.value = ''
+  }
+
   // ── Avatar del negocio ──
-  const BusinessAvatar = ({ size = 40 }: { size?: number }) => (
-    clienteLogo ? (
+  const BusinessAvatar = ({ size = 40, menuId }: { size?: number, menuId?: 'sidebar' | 'header' }) => {
+    const isOpen = !!menuId && menuLogoTarget === menuId
+    const avatarEl = clienteLogo ? (
       <img
         src={clienteLogo}
         alt={clienteNombre}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          border: '2px solid rgba(37,99,235,0.4)',
-          boxShadow: '0 0 0 3px rgba(37,99,235,0.1)',
-          flexShrink: 0,
-        }}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(37,99,235,0.4)', boxShadow: '0 0 0 3px rgba(37,99,235,0.1)', flexShrink: 0, display: 'block' }}
       />
     ) : (
-      <div style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, #1D4ED8, #38BDF8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'Syne, sans-serif',
-        fontWeight: 800,
-        fontSize: size * 0.38,
-        color: 'white',
-        flexShrink: 0,
-        border: '2px solid rgba(56,189,248,0.3)',
-        boxShadow: '0 0 12px rgba(37,99,235,0.3)',
-      }}>
+      <div style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(135deg, #1D4ED8, #38BDF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: size * 0.38, color: 'white', flexShrink: 0, border: '2px solid rgba(56,189,248,0.3)', boxShadow: '0 0 12px rgba(37,99,235,0.3)' }}>
         {clienteNombre.charAt(0).toUpperCase()}
       </div>
     )
-  )
+
+    if (!menuId) return avatarEl
+
+    return (
+      <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+        <motion.button
+          onClick={(e) => { e.stopPropagation(); setMenuLogoTarget(isOpen ? null : menuId) }}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', position: 'relative', display: 'block' }}
+          whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.96 }}
+        >
+          {avatarEl}
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isOpen ? 1 : 0, transition: 'opacity 0.2s' }}>
+            <Camera size={Math.round(size * 0.35)} color="white" />
+          </div>
+        </motion.button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.94, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: -4 }}
+              transition={{ duration: 0.15 }}
+              style={{ position: 'absolute', top: 'calc(100% + 8px)', ...(menuId === 'sidebar' ? { left: 0 } : { right: 0 }), background: '#1E3A5C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 6, zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: 168 }}
+            >
+              {clienteLogo && (
+                <button
+                  onClick={() => { setVerLogoAbierto(true); setMenuLogoTarget(null) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 12px', borderRadius: 8, background: 'transparent', border: 'none', cursor: 'pointer', color: '#94A3B8', fontFamily: 'DM Sans, sans-serif', fontSize: 14, textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Eye size={15} color="#60A5FA" />
+                  <span>Ver logo</span>
+                </button>
+              )}
+              <button
+                onClick={() => { fileInputRef.current?.click(); setMenuLogoTarget(null) }}
+                disabled={logoSubiendo}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 12px', borderRadius: 8, background: 'transparent', border: 'none', cursor: logoSubiendo ? 'not-allowed' : 'pointer', color: '#94A3B8', fontFamily: 'DM Sans, sans-serif', fontSize: 14, textAlign: 'left', opacity: logoSubiendo ? 0.6 : 1 }}
+                onMouseEnter={e => { if (!logoSubiendo) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {logoSubiendo
+                  ? <div style={{ width: 15, height: 15, border: '2px solid rgba(96,165,250,0.3)', borderTop: '2px solid #60A5FA', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                  : <Camera size={15} color="#60A5FA" />
+                }
+                <span>{logoSubiendo ? 'Subiendo...' : 'Cambiar logo'}</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
 
   // ── NavItem con color por módulo ──
   const NavItem = ({
@@ -309,6 +378,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           color: white;
           border-color: rgba(37,99,235,0.3);
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       {/* ══ SIDEBAR DESKTOP ══ */}
@@ -350,7 +420,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           }}
           layout
         >
-          <BusinessAvatar size={sidebarOpen ? 40 : 36} />
+          <BusinessAvatar size={sidebarOpen ? 40 : 36} menuId="sidebar" />
           <AnimatePresence>
             {sidebarOpen && (
               <motion.div
@@ -486,7 +556,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
                 border: '1px solid rgba(255,255,255,0.07)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
-                  <BusinessAvatar size={38} />
+                  <BusinessAvatar size={38} menuId="sidebar" />
                   <div style={{ overflow: 'hidden', minWidth: 0 }}>
                     <p style={{
                       fontFamily: 'Syne, sans-serif',
@@ -624,7 +694,7 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <BusinessAvatar size={34} />
+            <BusinessAvatar size={34} menuId="header" />
             <div>
               <p style={{
                 fontFamily: 'Syne, sans-serif',
@@ -668,6 +738,49 @@ export default function ClienteLayout({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+
+      {/* ══ MODAL VER LOGO ══ */}
+      <AnimatePresence>
+        {verLogoAbierto && clienteLogo && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setVerLogoAbierto(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ position: 'relative', maxWidth: 360, width: '100%' }}
+            >
+              <img
+                src={clienteLogo}
+                alt={clienteNombre}
+                style={{ width: '100%', borderRadius: 20, objectFit: 'cover', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', border: '2px solid rgba(255,255,255,0.1)', display: 'block' }}
+              />
+              <motion.button
+                onClick={() => setVerLogoAbierto(false)}
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                style={{ position: 'absolute', top: -14, right: -14, background: '#1E3A5C', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94A3B8', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
+              >
+                <X size={16} />
+              </motion.button>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, color: 'white', textAlign: 'center', marginTop: 14 }}>
+                {clienteNombre}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Input de logo oculto */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleLogoChange}
+      />
     </div>
   )
 }

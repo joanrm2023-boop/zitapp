@@ -31,6 +31,7 @@ export default function LoginPage() {
     nombre: string
     logo_url: string | null
   } | null>(null)
+  const [esProfesional, setEsProfesional] = useState(false)
 
   const router = useRouter()
 
@@ -51,19 +52,40 @@ export default function LoginPage() {
   const buscarNegocioPorEmail = async (emailBuscar: string) => {
     try {
       setBuscandoNegocio(true)
+      const emailNormalizado = emailBuscar.trim().toLowerCase()
+
+      // Buscar primero en clientes
       const { data, error } = await supabase
         .from('clientes')
         .select('nombre, logo_url')
-        .eq('correo', emailBuscar.trim().toLowerCase())
+        .eq('correo', emailNormalizado)
         .single()
 
-      if (error || !data) {
-        setNegocioEncontrado(null)
-      } else {
+      if (!error && data) {
         setNegocioEncontrado({ nombre: data.nombre, logo_url: data.logo_url })
+        setEsProfesional(false)
+        return
+      }
+
+      // Si no es cliente, buscar en barberos
+      const { data: barbero } = await supabase
+        .from('barberos')
+        .select('nombre_barbero, foto_url')
+        .ilike('correo_barbero', emailNormalizado)
+        .eq('activo', true)
+        .neq('estado', 'eliminado')
+        .maybeSingle()
+
+      if (barbero) {
+        setNegocioEncontrado({ nombre: barbero.nombre_barbero, logo_url: barbero.foto_url })
+        setEsProfesional(true)
+      } else {
+        setNegocioEncontrado(null)
+        setEsProfesional(false)
       }
     } catch {
       setNegocioEncontrado(null)
+      setEsProfesional(false)
     } finally {
       setBuscandoNegocio(false)
     }
@@ -154,6 +176,7 @@ export default function LoginPage() {
       const userId = data.user.id
       const { data: perfil } = await supabase.from('perfiles').select('rol').eq('user_id', userId).single()
       if (perfil?.rol === 'superadmin') { router.push('/admin'); setLoading(false); return }
+      if (perfil?.rol === 'profesional') { router.push('/dashboard-profesional'); setLoading(false); return }
       if (perfil?.rol === 'cliente') {
         const cliente = await verificarEstadoCliente(email)
         if (cliente.activo === 'Eliminado') { setError('Esta cuenta ha sido eliminada. Contacta al soporte.'); setLoading(false); return }
@@ -464,7 +487,7 @@ export default function LoginPage() {
                   {negocioEncontrado.nombre}
                 </h1>
                 <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: '#64748B' }}>
-                  Ingresa tu contraseña para continuar
+                  {esProfesional ? 'Accede a tus citas' : 'Ingresa tu contraseña para continuar'}
                 </p>
               </motion.div>
             ) : (

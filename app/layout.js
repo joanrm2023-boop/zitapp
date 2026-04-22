@@ -15,7 +15,7 @@ export const metadata = {
   title: "Zitapp - Agenda Digital para tu Negocio",
   description: "La agenda digital que tu Negocio necesita. Automatiza tus reservas, gestiona tus clientes y haz crecer tu negocio.",
   icons: {
-    icon: '/logo_Zitapp.png?v=2',  
+    icon: '/favicon.ico',
   },
 };
 
